@@ -7,7 +7,8 @@ defmodule LineCore.Application do
   def start(_type, _args) do
     children = [
       LineCore.Repo,
-      {Phoenix.PubSub, name: LineCore.PubSub.Bus}
+      {Phoenix.PubSub, name: LineCore.PubSub.Bus},
+      {Registry, keys: :unique, name: LineCore.PlaytestRegistry}
     ]
 
     opts = [strategy: :one_for_one, name: LineCore.Supervisor]
