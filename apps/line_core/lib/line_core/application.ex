@@ -6,7 +6,8 @@ defmodule LineCore.Application do
   @impl true
   def start(_type, _args) do
     children = [
-      LineCore.Repo
+      LineCore.Repo,
+      {Phoenix.PubSub, name: LineCore.PubSub.Bus}
     ]
 
     opts = [strategy: :one_for_one, name: LineCore.Supervisor]
