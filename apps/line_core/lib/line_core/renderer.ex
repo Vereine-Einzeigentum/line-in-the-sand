@@ -11,6 +11,11 @@ defmodule LineCore.Renderer do
   Each section can be one or more lines; missing sections collapse to nothing.
   Word-wrap is applied to description text.
 
+  Description resolution order:
+    1. `custom_description` property (set via `desc me as ...`)
+    2. The `description` column on the object (set at creation time)
+    3. Nothing rendered if neither is set
+
   Used by look/examine verbs and by room-entry rendering.
   """
 
@@ -21,8 +26,7 @@ defmodule LineCore.Renderer do
   @doc """
   Render an object in the standard five-section format.
 
-  Returns a list of lines; clients can join with newlines or render
-  per-line with their own styling.
+  Returns a list of lines.
   """
   def render(object) do
     [
@@ -38,29 +42,33 @@ defmodule LineCore.Renderer do
 
   defp render_name(%{name: name}), do: [name]
 
-  defp render_description(%{description: nil}), do: []
-  defp render_description(%{description: ""}), do: []
+  defp render_description(object) do
+    desc =
+      case Object.get_property(object.id, "custom_description") do
+        nil ->
+          object.description
 
-  defp render_description(%{description: desc}) do
-    word_wrap(desc, @wrap_width)
+        custom when is_binary(custom) and byte_size(custom) > 0 ->
+          custom
+
+        _ ->
+          object.description
+      end
+
+    case desc do
+      nil -> []
+      "" -> []
+      text -> word_wrap(text, @wrap_width)
+    end
   end
 
-  defp render_attachments(%{id: id, type: :player}) do
-    attachments = wielded_and_worn(id)
-    if attachments == [], do: [], else: attachments
-  end
-
-  defp render_attachments(%{id: id, type: :npc}) do
-    attachments = wielded_and_worn(id)
-    if attachments == [], do: [], else: attachments
-  end
-
+  defp render_attachments(%{id: id, type: :player}), do: wielded_and_worn(id)
+  defp render_attachments(%{id: id, type: :npc}), do: wielded_and_worn(id)
   defp render_attachments(_), do: []
 
   defp wielded_and_worn(object_id) do
     import Ecto.Query
-    alias LineCore.Repo
-    alias LineCore.Schemas.Relationship
+    alias LineCore.{Repo, Schemas.Relationship}
 
     from(o in LineCore.Schemas.Object,
       join: r in Relationship,
@@ -92,8 +100,6 @@ defmodule LineCore.Renderer do
       state -> [state]
     end
   end
-
-  ## Word-wrap
 
   defp word_wrap(text, width) do
     text

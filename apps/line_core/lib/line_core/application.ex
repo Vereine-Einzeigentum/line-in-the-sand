@@ -8,7 +8,8 @@ defmodule LineCore.Application do
     children = [
       LineCore.Repo,
       {Phoenix.PubSub, name: LineCore.PubSub.Bus},
-      {Registry, keys: :unique, name: LineCore.PlaytestRegistry}
+      {Registry, keys: :unique, name: LineCore.PlaytestRegistry},
+      LineCore.Presence
     ]
 
     opts = [strategy: :one_for_one, name: LineCore.Supervisor]

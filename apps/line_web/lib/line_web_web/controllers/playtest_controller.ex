@@ -14,13 +14,20 @@ defmodule LineWebWeb.PlaytestController do
   `PLAYTEST_TOKEN` is set via env var; if unset, the API is disabled and
   all requests return 503.
 
-  Command format: `{"verb": "look", "args": []}` or `{"raw": "look at fence"}`
-  (raw is parsed on the server; verb+args is pre-parsed).
+  Command formats accepted by /cmd:
+
+    1. Raw form (preferred for agentic playtest):
+       `{"raw": "look at fence"}`
+       Goes through LineCore.Parser. Single source of truth for input parsing.
+
+    2. Pre-parsed form (for programmatic clients that bypass the parser):
+       `{"verb": "look", "args": ["fence"]}`
+       Looks up verb directly in the parser's verb map.
   """
 
   use LineWebWeb, :controller
 
-  alias LineCore.PlaytestSession
+  alias LineCore.{Parser, PlaytestSession}
 
   ## Plug pipeline
 
@@ -49,9 +56,7 @@ defmodule LineWebWeb.PlaytestController do
         })
 
       {:error, reason} ->
-        conn
-        |> put_status(:bad_request)
-        |> json(%{error: inspect(reason)})
+        conn |> put_status(:bad_request) |> json(%{error: inspect(reason)})
     end
   end
 
@@ -61,17 +66,29 @@ defmodule LineWebWeb.PlaytestController do
     json(conn, info)
   end
 
+  def command(conn, %{"raw" => raw} = _params) when is_binary(raw) do
+    token = conn.assigns.session_token
+
+    case Parser.parse(raw) do
+      {:ok, verb_module, args} ->
+        dispatch_and_respond(conn, token, verb_module, args, raw)
+
+      {:empty, _} ->
+        conn |> put_status(:bad_request) |> json(%{error: "empty command"})
+
+      {:unknown, verb, _input} ->
+        conn |> put_status(:bad_request) |> json(%{error: "unknown verb: #{verb}"})
+    end
+  end
+
   def command(conn, %{"verb" => verb} = params) do
     token = conn.assigns.session_token
     args = Map.get(params, "args", [])
-    raw = Map.get(params, "raw", "#{verb} #{Enum.join(args, " ")}")
+    raw = "#{verb} #{Enum.join(args, " ")}" |> String.trim()
 
-    case resolve_verb(verb) do
+    case lookup_verb(verb) do
       {:ok, verb_module} ->
-        case PlaytestSession.dispatch_command(token, verb_module, args, raw) do
-          :ok -> json(conn, %{status: "dispatched", verb: verb})
-          {:error, reason} -> conn |> put_status(:bad_request) |> json(%{error: inspect(reason)})
-        end
+        dispatch_and_respond(conn, token, verb_module, args, raw)
 
       :error ->
         conn |> put_status(:bad_request) |> json(%{error: "unknown verb: #{verb}"})
@@ -79,7 +96,9 @@ defmodule LineWebWeb.PlaytestController do
   end
 
   def command(conn, _params) do
-    conn |> put_status(:bad_request) |> json(%{error: "missing required field: verb"})
+    conn
+    |> put_status(:bad_request)
+    |> json(%{error: "request must include either 'raw' or 'verb' field"})
   end
 
   def feed(conn, params) do
@@ -144,24 +163,26 @@ defmodule LineWebWeb.PlaytestController do
     end
   end
 
-  ## Verb resolution
+  ## Verb resolution from pre-parsed form
 
-  # Map of HTTP verb strings to Elixir modules. Extend as new verbs ship.
-  @verb_map %{
-    "look" => LineCore.Verbs.Look,
-    "l" => LineCore.Verbs.Look
-  }
-
-  defp resolve_verb(verb) when is_binary(verb) do
-    case Map.get(@verb_map, String.downcase(verb)) do
+  defp lookup_verb(verb) when is_binary(verb) do
+    case Map.get(Parser.verb_map(), String.downcase(verb)) do
       nil -> :error
       module -> {:ok, module}
     end
   end
 
+  defp dispatch_and_respond(conn, token, verb_module, args, raw) do
+    case PlaytestSession.dispatch_command(token, verb_module, args, raw) do
+      :ok ->
+        json(conn, %{status: "dispatched", verb: inspect(verb_module), args: args})
+
+      {:error, reason} ->
+        conn |> put_status(:bad_request) |> json(%{error: inspect(reason)})
+    end
+  end
+
   defp default_starting_room do
-    # Configurable: SYSTEM_STARTING_ROOM_ID env var, else error.
-    # In Phase 0 with hand-authored content, the handler sets this once.
     case System.get_env("PLAYTEST_STARTING_ROOM_ID") do
       nil -> raise "PLAYTEST_STARTING_ROOM_ID env var must be set for playtest sessions"
       id -> id
