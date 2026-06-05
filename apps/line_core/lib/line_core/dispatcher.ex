@@ -6,6 +6,23 @@ defmodule LineCore.Dispatcher do
 
   This is the only place side effects from verbs happen. Verbs are pure;
   everything that touches the DB or the network goes through here.
+
+  ## Event types
+
+  Persistent (applied via Ecto.Multi):
+  - `{:set_property, object_id, key, value}`
+  - `{:delete_property, object_id, key}`
+  - `{:move, object_id, container_id, rel_type}` — moves an object, deleting prior relationships *of the same type*
+  - `{:relate, from_id, to_id, rel_type}` — adds a relationship
+  - `{:unrelate, from_id, to_id, rel_type}` — removes a relationship
+  - `{:create_object, attrs}`
+  - `{:delete_object, object_id}` — soft delete
+
+  Notification (broadcast via PubSub, no DB impact):
+  - `{:notify_actor, msg}`
+  - `{:notify_room, msg}` / `{:notify_room, msg, opts}` (opts: `except: [...]`)
+  - `{:notify_object, object_id, msg}` — direct message to any object via actor topic
+  - `{:broadcast_channel, channel, msg}`
   """
 
   alias LineCore.{Object, Repo}
@@ -13,14 +30,6 @@ defmodule LineCore.Dispatcher do
   alias LineCore.Verb.Context
   alias Ecto.Multi
 
-  @doc """
-  Dispatch a parsed command.
-
-  `actor_id`: the player or NPC performing the action
-  `verb_module`: the module implementing LineCore.Verb behaviour
-  `args`: parsed args from the command parser
-  `raw_command`: original command string (for logging)
-  """
   def dispatch(actor_id, verb_module, args, raw_command) do
     with {:ok, actor} <- fetch_actor(actor_id),
          {:ok, room} <- fetch_room(actor),
@@ -33,8 +42,6 @@ defmodule LineCore.Dispatcher do
       :ok
     end
   end
-
-  ## Actor/room resolution
 
   defp fetch_actor(actor_id) do
     case LineCore.Object.get(actor_id) do
@@ -60,8 +67,6 @@ defmodule LineCore.Dispatcher do
     }
   end
 
-  ## Requirements check
-
   defp check_requirements(actor, verb_module) do
     if function_exported?(verb_module, :requirements, 0) do
       reqs = verb_module.requirements()
@@ -80,8 +85,6 @@ defmodule LineCore.Dispatcher do
     end
   end
 
-  ## Event application — transactional
-
   defp apply_events(events, context) do
     events
     |> Enum.reduce(Multi.new(), fn event, multi ->
@@ -93,7 +96,7 @@ defmodule LineCore.Dispatcher do
   defp apply_event_to_multi(multi, {:set_property, object_id, key, value}, _ctx) do
     stored = if is_map(value), do: value, else: %{"v" => value}
 
-    Multi.insert(multi, {:set_property, object_id, key},
+    Multi.insert(multi, {:set_property, object_id, key, make_ref()},
       %Property{}
       |> Property.changeset(%{object_id: object_id, key: key, value: stored}),
       on_conflict: [set: [value: stored, updated_at: DateTime.utc_now()]],
@@ -106,7 +109,7 @@ defmodule LineCore.Dispatcher do
 
     Multi.delete_all(
       multi,
-      {:delete_property, object_id, key},
+      {:delete_property, object_id, key, make_ref()},
       from(p in Property, where: p.object_id == ^object_id and p.key == ^key)
     )
   end
@@ -116,16 +119,35 @@ defmodule LineCore.Dispatcher do
 
     multi
     |> Multi.delete_all(
-      {:remove_old_container, object_id},
+      {:remove_old_container, object_id, make_ref()},
       from(r in Relationship, where: r.to_id == ^object_id and r.type == ^rel_type)
     )
-    |> Multi.insert({:move, object_id, to_container_id},
+    |> Multi.insert({:move, object_id, to_container_id, make_ref()},
       %Relationship{}
       |> Relationship.changeset(%{
         from_id: to_container_id,
         to_id: object_id,
         type: rel_type
       })
+    )
+  end
+
+  defp apply_event_to_multi(multi, {:relate, from_id, to_id, rel_type}, _ctx) do
+    Multi.insert(multi, {:relate, from_id, to_id, rel_type, make_ref()},
+      %Relationship{}
+      |> Relationship.changeset(%{from_id: from_id, to_id: to_id, type: rel_type})
+    )
+  end
+
+  defp apply_event_to_multi(multi, {:unrelate, from_id, to_id, rel_type}, _ctx) do
+    import Ecto.Query
+
+    Multi.delete_all(
+      multi,
+      {:unrelate, from_id, to_id, rel_type, make_ref()},
+      from(r in Relationship,
+        where: r.from_id == ^from_id and r.to_id == ^to_id and r.type == ^rel_type
+      )
     )
   end
 
@@ -136,19 +158,16 @@ defmodule LineCore.Dispatcher do
   defp apply_event_to_multi(multi, {:delete_object, object_id}, _ctx) do
     Multi.update(
       multi,
-      {:delete_object, object_id},
+      {:delete_object, object_id, make_ref()},
       Object.changeset(%Object{id: object_id}, %{deleted_at: DateTime.utc_now()})
     )
   end
 
-  # Notify events have no DB impact; they get broadcast in broadcast_events/2.
   defp apply_event_to_multi(multi, {:notify_actor, _}, _ctx), do: multi
   defp apply_event_to_multi(multi, {:notify_room, _, _}, _ctx), do: multi
   defp apply_event_to_multi(multi, {:notify_room, _}, _ctx), do: multi
   defp apply_event_to_multi(multi, {:notify_object, _, _}, _ctx), do: multi
   defp apply_event_to_multi(multi, {:broadcast_channel, _, _}, _ctx), do: multi
-
-  ## Event broadcasting via PubSub
 
   defp broadcast_events(events, context) do
     Enum.each(events, fn event -> broadcast_event(event, context) end)
