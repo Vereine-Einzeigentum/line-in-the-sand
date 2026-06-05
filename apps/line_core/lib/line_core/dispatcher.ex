@@ -156,10 +156,13 @@ defmodule LineCore.Dispatcher do
   end
 
   defp apply_event_to_multi(multi, {:delete_object, object_id}, _ctx) do
-    Multi.update(
+    import Ecto.Query
+
+    Multi.update_all(
       multi,
       {:delete_object, object_id, make_ref()},
-      Object.changeset(%Object{id: object_id}, %{deleted_at: DateTime.utc_now()})
+      from(o in Object, where: o.id == ^object_id),
+      set: [deleted_at: DateTime.utc_now()]
     )
   end
 

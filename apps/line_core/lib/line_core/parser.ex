@@ -2,10 +2,8 @@ defmodule LineCore.Parser do
   @moduledoc """
   Translates raw command strings into `{verb_module, args}` tuples.
 
-  See INTEGRATION.md for the canonical syntax.
-
-  Combat additions (Step 5): `attack`/`kill`/`hit`/`k` → Attack;
-  `wield`/`hold`/`equip` → Wield with optional `main`/`off` hand modifier.
+  Step 6 additions: `scrap` and `sell` verbs. Sell uses two-object syntax:
+  `sell <item> to <npc>` is parsed into two args via the "X to Y" pattern.
   """
 
   alias LineCore.Verbs
@@ -39,8 +37,6 @@ defmodule LineCore.Parser do
     "who" => Verbs.Who,
     "desc" => Verbs.Desc,
     "describe" => Verbs.Desc,
-
-    # Combat
     "attack" => Verbs.Attack,
     "kill" => Verbs.Attack,
     "k" => Verbs.Attack,
@@ -51,7 +47,13 @@ defmodule LineCore.Parser do
     "punch" => Verbs.Attack,
     "wield" => Verbs.Wield,
     "hold" => Verbs.Wield,
-    "equip" => Verbs.Wield
+    "equip" => Verbs.Wield,
+
+    # Scrap loop
+    "scrap" => Verbs.Scrap,
+    "salvage" => Verbs.Scrap,
+    "sell" => Verbs.Sell,
+    "fence" => Verbs.Sell
   }
 
   def parse(input) when is_binary(input) do
@@ -78,12 +80,8 @@ defmodule LineCore.Parser do
     verb_down = String.downcase(verb)
 
     case Map.get(@verb_map, verb_down) do
-      nil ->
-        {:unknown, verb_down, input}
-
-      module ->
-        args = parse_args(module, rest)
-        {:ok, module, args}
+      nil -> {:unknown, verb_down, input}
+      module -> {:ok, module, parse_args(module, rest)}
     end
   end
 
@@ -122,10 +120,17 @@ defmodule LineCore.Parser do
   defp parse_args(Verbs.Go, rest), do: [String.downcase(rest)]
   defp parse_args(Verbs.Inventory, _rest), do: []
 
-  # Wield: <item>, <item> main, <item> off
   defp parse_args(Verbs.Wield, rest) do
     case Regex.run(~r/^(.+?)\s+(main|off)$/i, rest) do
       [_, item, hand] -> [String.trim(item), String.downcase(hand)]
+      _ -> [rest]
+    end
+  end
+
+  # Sell uses "X to Y" syntax: split on " to " or " at " for `fence` alias
+  defp parse_args(Verbs.Sell, rest) do
+    case Regex.run(~r/^(.+?)\s+(?:to|at)\s+(.+)$/i, rest) do
+      [_, item, target] -> [String.trim(item), String.trim(target)]
       _ -> [rest]
     end
   end
