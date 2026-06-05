@@ -103,6 +103,7 @@ defmodule LineWebWeb.PlaytestControllerTest do
     conn = auth(conn) |> delete("/api/playtest/sessions/#{token}")
     assert json_response(conn, 200)["status"] == "terminated"
 
+    Process.sleep(50)
     refute LineCore.PlaytestSession.exists?(token)
   end
 
