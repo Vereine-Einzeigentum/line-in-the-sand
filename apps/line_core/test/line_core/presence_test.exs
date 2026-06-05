@@ -4,10 +4,30 @@ defmodule LineCore.PresenceTest do
   alias LineCore.Presence
 
   setup do
-    # Clean any prior registrations from this test process
-    Presence.unregister("test-player-1")
-    Presence.unregister("test-player-2")
+    # Registry entries vanish asynchronously when the process that registered
+    # them dies. A prior test's process may still be reaping its registration,
+    # so wait for a clean slate before starting. (Calling `unregister` here is a
+    # no-op for entries owned by an already-dead process — only the owning
+    # process can unregister itself — so we must poll instead.)
+    wait_until(fn ->
+      not Presence.online?("test-player-1") and not Presence.online?("test-player-2")
+    end)
+
     :ok
+  end
+
+  defp wait_until(fun, retries \\ 100) do
+    cond do
+      fun.() ->
+        :ok
+
+      retries == 0 ->
+        flunk("Presence registry did not reach a clean state in time")
+
+      true ->
+        Process.sleep(10)
+        wait_until(fun, retries - 1)
+    end
   end
 
   test "register and unregister round-trip" do
