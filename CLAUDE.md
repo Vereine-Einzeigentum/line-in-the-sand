@@ -23,7 +23,7 @@ and a websocket channel are working. `line_world` and `line_ml` are still stubs.
 - **Phoenix.PubSub** for in-process broadcast; **Phoenix Channels** for websockets
 - No Tailwind / CSS framework, no esbuild — static CSS is served from
   `apps/line_web/priv/static/assets/`. Do not add a frontend build pipeline
-  without checking first; it was deliberately omitted.
+  without checking first; it was deliberately omitted. The Frontend is the Client. The Repo is the server.
 
 ## Umbrella layout
 
@@ -129,7 +129,7 @@ display is rendered by `LineCore.Renderer` (a five-section format with word-wrap
 - **`LineCore.PlaytestSession`** — a `GenServer` (one per session, registered in
   `LineCore.PlaytestRegistry`) that owns an ephemeral player object, subscribes
   to its topics, and buffers messages in a bounded queue for HTTP long-poll
-  delivery. Idle-expires after 15 minutes and soft-deletes the player.
+  delivery. Idle-expires after 15 minutes and soft-deletes the player. [this is not implementation spec, just testing]
 
 ### The web layer (`line_web`)
 
@@ -202,23 +202,23 @@ Dev DB defaults (`config/dev.exs`): `postgres`/`postgres` @ `localhost`, databas
 
 ## Conventions & gotchas
 
-- **UUIDs everywhere.** All IDs are `binary_id`. Don't assume integer ids.
+- **UUIDs everywhere.** All IDs are `binary_id`. Don't assume integer ids. [we should probly move towards hex or b64]
 - **Soft deletes.** `Object.deleted_at` — all `LineCore.Object` queries already
   filter `is_nil(deleted_at)`. Preserve that filter in any new query (journal
-  integrity depends on rows sticking around).
+  integrity depends on rows sticking around). [do not delete the mother object]
 - **Property values are JSONB-wrapped.** Use `Object.get_property/2,3` and
   `set_property/3`; don't read `Property.value` directly (it's `%{"v" => ...}`
   for scalars).
 - **Keep verbs pure.** This is the load-bearing convention. Side effects belong
-  in the dispatcher via events.
+  in the object as controlled by the dispatcher via events.
 - **Zero-warning builds.** The project standard is
   `mix compile --warnings-as-errors` clean. The only known warning is from
-  upstream `ecto_sql` on OTP 26 (`Process.set_label/1`), not project code.
+  upstream `ecto_sql` on OTP 26 (`Process.set_label/1`), not project code. This is not intentional, do better.
 - **`mix format`** is configured at the root (`.formatter.exs`, with
   `subdirectories: ["apps/*"]`). Run it before committing.
 - Lower apps (`line_world`, `line_ml`, `line_shared`) are intentionally
   near-empty. When you start filling them in, respect the downward dependency
-  rule and add a supervision tree only if the app actually needs one.
+  rule and add a supervision tree only if the app actually needs one. [it probly will]
 
 ## World content
 
