@@ -19,7 +19,7 @@ defmodule LineWebWeb.GameChannelTest do
 
   defp connect_player(player) do
     {:ok, socket} =
-      connect(UserSocket, %{"player_id" => player.id})
+      connect(UserSocket, %{"token" => LineWebWeb.PlayerToken.sign(player.id)})
 
     {:ok, _, socket} = subscribe_and_join(socket, GameChannel, "game:#{player.id}")
     socket
@@ -84,7 +84,7 @@ defmodule LineWebWeb.GameChannelTest do
     {:ok, p1} = Object.create(:player, "Player1")
     {:ok, p2} = Object.create(:player, "Player2")
 
-    {:ok, socket} = connect(UserSocket, %{"player_id" => p1.id})
+    {:ok, socket} = connect(UserSocket, %{"token" => LineWebWeb.PlayerToken.sign(p1.id)})
 
     assert {:error, %{reason: "player_id mismatch"}} =
              subscribe_and_join(socket, GameChannel, "game:#{p2.id}")

@@ -137,8 +137,14 @@ Two ways into the game, both routing raw input through `LineCore.Parser` and the
 `LineCore.Dispatcher`:
 
 - **Websocket** — `LineWebWeb.UserSocket` (`game:*` channel →
-  `LineWebWeb.GameChannel`). Phase 0 auth is just a `player_id` UUID in connect
-  params; the socket verifies it's a `:player`-type object. No passwords yet.
+  `LineWebWeb.GameChannel`). Auth takes a **signed `token`** in connect params
+  (`LineWebWeb.PlayerToken`, backed by `Phoenix.Token` and the endpoint's
+  `secret_key_base`, 24h lifetime); the socket verifies the signature, then that
+  the id it names is a live `:player` object. **Raw player UUIDs are not
+  accepted** — ids are identifiers, not credentials, which matters because the
+  journal records `actor_id` on every dispatch and the world model reads it.
+  The playtest API returns a `socket_token` alongside the session. There are
+  still no passwords; token minting is whatever authenticates the player.
   The channel subscribes the connection to the actor + room topics, registers
   presence, forwards PubSub messages to the client, and re-subscribes on room
   changes after `go`.
