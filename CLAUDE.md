@@ -212,8 +212,12 @@ Dev DB defaults (`config/dev.exs`): `postgres`/`postgres` @ `localhost`, databas
 - **Keep verbs pure.** This is the load-bearing convention. Side effects belong
   in the object as controlled by the dispatcher via events.
 - **Zero-warning builds.** The project standard is
-  `mix compile --warnings-as-errors` clean. The only known warning is from
-  upstream `ecto_sql` on OTP 26 (`Process.set_label/1`), not project code. This is not intentional, do better.
+  `mix compile --warnings-as-errors` clean, and `mix test` warning-free too —
+  test files included (no unused aliases or variables). Project code currently
+  meets this. The remaining warnings all come from upstream deps when they are
+  recompiled from scratch: `ecto_sql` on OTP 26 (`Process.set_label/1`) and two
+  in `phoenix`'s `code_reloader/server.ex`. Those are not ours to fix; anything
+  originating in `apps/` is.
 - **`mix format`** is configured at the root (`.formatter.exs`, with
   `subdirectories: ["apps/*"]`). Run it before committing.
 - Lower apps (`line_world`, `line_ml`, `line_shared`) are intentionally
