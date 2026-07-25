@@ -212,6 +212,31 @@ defmodule LineCore.ParserTest do
     end
   end
 
+  describe "parse/1 — help verb structure" do
+    test "bare help" do
+      assert {:ok, Verbs.Help, []} = Parser.parse("help")
+    end
+
+    test "help <verb>" do
+      assert {:ok, Verbs.Help, ["look"]} = Parser.parse("help look")
+    end
+
+    test "h alias routes to Help" do
+      assert {:ok, Verbs.Help, []} = Parser.parse("h")
+      assert {:ok, Verbs.Help, ["attack"]} = Parser.parse("h attack")
+    end
+
+    test "commands alias routes to Help" do
+      assert {:ok, Verbs.Help, []} = Parser.parse("commands")
+      assert {:ok, Verbs.Help, ["say"]} = Parser.parse("commands say")
+    end
+
+    test "? alias routes to Help" do
+      assert {:ok, Verbs.Help, []} = Parser.parse("?")
+      assert {:ok, Verbs.Help, ["go"]} = Parser.parse("? go")
+    end
+  end
+
   describe "parse/1 — unknown verbs" do
     test "unrecognized verb returns :unknown" do
       assert {:unknown, "blarg", _} = Parser.parse("blarg")

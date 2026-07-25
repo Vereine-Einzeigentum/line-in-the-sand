@@ -63,7 +63,13 @@ defmodule LineCore.Parser do
     "scrap" => Verbs.Scrap,
     "salvage" => Verbs.Scrap,
     "sell" => Verbs.Sell,
-    "fence" => Verbs.Sell
+    "fence" => Verbs.Sell,
+
+    # Help
+    "help" => Verbs.Help,
+    "h" => Verbs.Help,
+    "commands" => Verbs.Help,
+    "?" => Verbs.Help
   }
 
   def parse(input) when is_binary(input) do
@@ -162,6 +168,13 @@ defmodule LineCore.Parser do
     case rest do
       "" -> []
       item -> [item]
+    end
+  end
+
+  defp parse_args(Verbs.Help, rest) do
+    case rest do
+      "" -> []
+      verb -> [verb]
     end
   end
 
