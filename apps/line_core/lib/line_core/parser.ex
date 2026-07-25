@@ -53,6 +53,11 @@ defmodule LineCore.Parser do
     "score" => Verbs.Score,
     "stats" => Verbs.Score,
     "sc" => Verbs.Score,
+    "unwield" => Verbs.Unwield,
+    "unequip" => Verbs.Unwield,
+    "sheathe" => Verbs.Unwield,
+    "give" => Verbs.Give,
+    "hand" => Verbs.Give,
 
     # Scrap loop
     "scrap" => Verbs.Scrap,
@@ -142,6 +147,21 @@ defmodule LineCore.Parser do
     case Regex.run(~r/^(.+?)\s+(?:to|at)\s+(.+)$/i, rest) do
       [_, item, target] -> [String.trim(item), String.trim(target)]
       _ -> [rest]
+    end
+  end
+
+  # Give uses "X to Y" syntax: same as Sell
+  defp parse_args(Verbs.Give, rest) do
+    case Regex.run(~r/^(.+?)\s+to\s+(.+)$/i, rest) do
+      [_, item, target] -> [String.trim(item), String.trim(target)]
+      _ -> [rest]
+    end
+  end
+
+  defp parse_args(Verbs.Unwield, rest) do
+    case rest do
+      "" -> []
+      item -> [item]
     end
   end
 

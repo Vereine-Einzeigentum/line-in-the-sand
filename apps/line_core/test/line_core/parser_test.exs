@@ -173,6 +173,45 @@ defmodule LineCore.ParserTest do
     end
   end
 
+  describe "parse/1 — give verb structure" do
+    test "give <item> to <player>" do
+      assert {:ok, Verbs.Give, ["sword", "Alice"]} = Parser.parse("give sword to Alice")
+    end
+
+    test "give with multi-word item and recipient" do
+      assert {:ok, Verbs.Give, ["rusty sword", "Alice"]} =
+               Parser.parse("give rusty sword to Alice")
+    end
+
+    test "hand alias routes to Give" do
+      assert {:ok, Verbs.Give, ["knife", "Bob"]} = Parser.parse("hand knife to Bob")
+    end
+
+    test "give without recipient returns malformed" do
+      assert {:ok, Verbs.Give, ["sword"]} = Parser.parse("give sword")
+    end
+  end
+
+  describe "parse/1 — unwield verb structure" do
+    test "bare unwield" do
+      assert {:ok, Verbs.Unwield, []} = Parser.parse("unwield")
+    end
+
+    test "unwield <item>" do
+      assert {:ok, Verbs.Unwield, ["sword"]} = Parser.parse("unwield sword")
+    end
+
+    test "unequip alias routes to Unwield" do
+      assert {:ok, Verbs.Unwield, []} = Parser.parse("unequip")
+      assert {:ok, Verbs.Unwield, ["shield"]} = Parser.parse("unequip shield")
+    end
+
+    test "sheathe alias routes to Unwield" do
+      assert {:ok, Verbs.Unwield, []} = Parser.parse("sheathe")
+      assert {:ok, Verbs.Unwield, ["sword"]} = Parser.parse("sheathe sword")
+    end
+  end
+
   describe "parse/1 — unknown verbs" do
     test "unrecognized verb returns :unknown" do
       assert {:unknown, "blarg", _} = Parser.parse("blarg")

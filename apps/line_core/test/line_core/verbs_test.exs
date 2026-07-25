@@ -2,7 +2,21 @@ defmodule LineCore.VerbsTest do
   use ExUnit.Case, async: false
 
   alias LineCore.{Object, Repo, TestHarness}
-  alias LineCore.Verbs.{Go, Get, Drop, Examine, Inventory, Say, Text, Who, Desc, Emote, Score}
+  alias LineCore.Verbs.{
+    Go,
+    Get,
+    Drop,
+    Examine,
+    Inventory,
+    Say,
+    Text,
+    Who,
+    Desc,
+    Emote,
+    Score,
+    Give,
+    Unwield
+  }
 
   setup do
     Ecto.Adapters.SQL.Sandbox.checkout(Repo)
@@ -371,6 +385,163 @@ defmodule LineCore.VerbsTest do
       room = TestHarness.spawn_room("Hub")
       player = TestHarness.spawn_player_in(room)
       assert {:error, :bad_args} = TestHarness.dispatch(player, Score, ["arg"])
+    end
+  end
+  ## Give
+
+  describe "Give" do
+    test "transfers item from actor inventory to recipient" do
+      room = TestHarness.spawn_room("Hub")
+      alice = TestHarness.spawn_player_in(room, "Alice")
+      bob = TestHarness.spawn_player_in(room, "Bob")
+      {:ok, knife} = Object.create(:item, "knife")
+      Object.relate(alice.id, knife.id, :contains)
+
+      {:ok, events} =
+        Give.execute(
+          %LineCore.Verb.Context{
+            actor: alice,
+            room: room,
+            room_contents: [alice, bob]
+          },
+          ["knife", "Bob"]
+        )
+
+      move_event = Enum.find(events, &match?({:move, _, _, _}, &1))
+      assert {:move, item_id, recipient_id, :contains} = move_event
+      assert item_id == knife.id
+      assert recipient_id == bob.id
+    end
+
+    test "errors when item not in inventory" do
+      room = TestHarness.spawn_room("Hub")
+      alice = TestHarness.spawn_player_in(room, "Alice")
+      bob = TestHarness.spawn_player_in(room, "Bob")
+
+      assert {:error, :not_holding} =
+               Give.execute(
+                 %LineCore.Verb.Context{
+                   actor: alice,
+                   room: room,
+                   room_contents: [alice, bob]
+                 },
+                 ["sword", "Bob"]
+               )
+    end
+
+    test "errors when recipient not in room" do
+      room = TestHarness.spawn_room("Hub")
+      alice = TestHarness.spawn_player_in(room, "Alice")
+      {:ok, knife} = Object.create(:item, "knife")
+      Object.relate(alice.id, knife.id, :contains)
+
+      assert {:error, :not_found} =
+               Give.execute(
+                 %LineCore.Verb.Context{
+                   actor: alice,
+                   room: room,
+                   room_contents: [alice]
+                 },
+                 ["knife", "Bob"]
+               )
+    end
+
+    test "errors when giving to self" do
+      room = TestHarness.spawn_room("Hub")
+      alice = TestHarness.spawn_player_in(room, "Alice")
+      {:ok, knife} = Object.create(:item, "knife")
+      Object.relate(alice.id, knife.id, :contains)
+
+      assert {:error, :cannot_give_self} =
+               Give.execute(
+                 %LineCore.Verb.Context{
+                   actor: alice,
+                   room: room,
+                   room_contents: [alice]
+                 },
+                 ["knife", "Alice"]
+               )
+    end
+  end
+
+  ## Unwield
+
+  describe "Unwield" do
+    test "unwields all items when no argument given" do
+      room = TestHarness.spawn_room("Hub")
+      actor = TestHarness.spawn_player_in(room)
+      {:ok, sword} = Object.create(:item, "sword")
+      {:ok, shield} = Object.create(:item, "shield")
+      Object.relate(actor.id, sword.id, :wields_main)
+      Object.relate(actor.id, shield.id, :wields_off)
+
+      {:ok, events} =
+        Unwield.execute(
+          %LineCore.Verb.Context{
+            actor: actor,
+            room: room,
+            room_contents: [actor]
+          },
+          []
+        )
+
+      # Should have unrelate events for both items
+      unrelate_events = Enum.filter(events, &match?({:unrelate, _, _, _}, &1))
+      assert length(unrelate_events) == 2
+    end
+
+    test "unwields specific item by name" do
+      room = TestHarness.spawn_room("Hub")
+      actor = TestHarness.spawn_player_in(room)
+      {:ok, sword} = Object.create(:item, "sword")
+      Object.relate(actor.id, sword.id, :wields_main)
+
+      {:ok, events} =
+        Unwield.execute(
+          %LineCore.Verb.Context{
+            actor: actor,
+            room: room,
+            room_contents: [actor]
+          },
+          ["sword"]
+        )
+
+      assert Enum.any?(events, fn
+               {:unrelate, _, item_id, :wields_main} -> item_id == sword.id
+               _ -> false
+             end)
+    end
+
+    test "errors when nothing is wielded" do
+      room = TestHarness.spawn_room("Hub")
+      actor = TestHarness.spawn_player_in(room)
+
+      assert {:error, :not_wielding} =
+               Unwield.execute(
+                 %LineCore.Verb.Context{
+                   actor: actor,
+                   room: room,
+                   room_contents: [actor]
+                 },
+                 []
+               )
+    end
+
+    test "errors when trying to unwield non-wielded item" do
+      room = TestHarness.spawn_room("Hub")
+      actor = TestHarness.spawn_player_in(room)
+      {:ok, sword} = Object.create(:item, "sword")
+      Object.relate(actor.id, sword.id, :contains)
+
+      assert {:error, :not_wielding} =
+               Unwield.execute(
+                 %LineCore.Verb.Context{
+                   actor: actor,
+                   room: room,
+                   room_contents: [actor]
+                 },
+                 ["sword"]
+               )
     end
   end
 end
