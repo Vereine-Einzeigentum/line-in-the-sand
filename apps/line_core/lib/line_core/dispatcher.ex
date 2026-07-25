@@ -7,6 +7,10 @@ defmodule LineCore.Dispatcher do
   This is the only place side effects from verbs happen. Verbs are pure;
   everything that touches the DB or the network goes through here.
 
+  Every successful dispatch is also recorded in the append-only journal
+  (`LineCore.Journal`) inside the same transaction, capturing the raw command,
+  resolved verb/args, and the full event list.
+
   ## Event types
 
   Persistent (applied via Ecto.Multi):
@@ -37,7 +41,7 @@ defmodule LineCore.Dispatcher do
          :ok <- check_requirements(actor, verb_module),
          context = build_context(actor, room, contents, raw_command),
          {:ok, events} <- verb_module.execute(context, args),
-         {:ok, _result} <- apply_events(events, context) do
+         {:ok, _result} <- apply_events(events, context, verb_module, args, raw_command) do
       broadcast_events(events, context)
       :ok
     end
@@ -85,11 +89,12 @@ defmodule LineCore.Dispatcher do
     end
   end
 
-  defp apply_events(events, context) do
+  defp apply_events(events, context, verb_module, args, raw_command) do
     events
     |> Enum.reduce(Multi.new(), fn event, multi ->
       apply_event_to_multi(multi, event, context)
     end)
+    |> LineCore.Journal.record(context, verb_module, args, events, raw_command)
     |> Repo.transaction()
   end
 
