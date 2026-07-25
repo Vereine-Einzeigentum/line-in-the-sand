@@ -31,7 +31,7 @@ defmodule LineCore.Object do
   end
 
   @doc "Fetch an object by id or raise."
-  def get!(id), do: get(id) || raise "object not found: #{id}"
+  def get!(id), do: get(id) || raise("object not found: #{id}")
 
   ## Properties
 

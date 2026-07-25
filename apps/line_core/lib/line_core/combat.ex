@@ -59,12 +59,10 @@ defmodule LineCore.Combat do
 
     [
       {:set_property, target_id, "hp_current", new_hp},
-      {:notify_actor,
-       "You hit #{target.name} for #{damage} damage. (#{new_hp} HP remaining)"},
+      {:notify_actor, "You hit #{target.name} for #{damage} damage. (#{new_hp} HP remaining)"},
       {:notify_object, target_id,
        "#{attacker.name} hits you for #{damage} damage. (#{new_hp} HP remaining)"},
-      {:notify_room, "#{attacker.name} hits #{target.name}.",
-       except: [attacker_id, target_id]}
+      {:notify_room, "#{attacker.name} hits #{target.name}.", except: [attacker_id, target_id]}
     ]
   end
 

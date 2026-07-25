@@ -53,51 +53,39 @@ defmodule LineCore.Seed.DistrictOne do
 
   defp do_seed do
     {:ok, safehouse} =
-      Object.create(:room, @safehouse_name,
-        %{
-          description:
-            "A concrete cube, low ceiling, single hanging bulb. A folding chair leans against one wall. The hum of THE LINE's massive ventilation never quite stops."
-        }
-      )
+      Object.create(:room, @safehouse_name, %{
+        description:
+          "A concrete cube, low ceiling, single hanging bulb. A folding chair leans against one wall. The hum of THE LINE's massive ventilation never quite stops."
+      })
 
     {:ok, fence_shop} =
-      Object.create(:room, "District One: Fence Shop",
-        %{
-          description:
-            "Steel bins of sorted parts line the walls. Behind the counter, a faded poster of the King smiles at nothing in particular. The fluorescent flickers."
-        }
-      )
+      Object.create(:room, "District One: Fence Shop", %{
+        description:
+          "Steel bins of sorted parts line the walls. Behind the counter, a faded poster of the King smiles at nothing in particular. The fluorescent flickers."
+      })
 
     {:ok, sz_center} =
-      Object.create(:room, "District One: Scrap Zone Center",
-        %{
-          description:
-            "Rusted lattice underfoot, dust thick on every surface. The remains of a service catwalk overhead drip slow brown water. Junk in every direction."
-        }
-      )
+      Object.create(:room, "District One: Scrap Zone Center", %{
+        description:
+          "Rusted lattice underfoot, dust thick on every surface. The remains of a service catwalk overhead drip slow brown water. Junk in every direction."
+      })
 
     {:ok, sz_n} =
-      Object.create(:room, "District One: Scrap Zone (North)",
-        %{
-          description: "Stripped panels and twisted rebar. Dust here is older."
-        }
-      )
+      Object.create(:room, "District One: Scrap Zone (North)", %{
+        description: "Stripped panels and twisted rebar. Dust here is older."
+      })
 
     {:ok, sz_e} =
-      Object.create(:room, "District One: Scrap Zone (East)",
-        %{
-          description:
-            "A collapsed compressor cabinet, its guts trailing copper into a puddle of fluorescent coolant."
-        }
-      )
+      Object.create(:room, "District One: Scrap Zone (East)", %{
+        description:
+          "A collapsed compressor cabinet, its guts trailing copper into a puddle of fluorescent coolant."
+      })
 
     {:ok, sz_w} =
-      Object.create(:room, "District One: Scrap Zone (West)",
-        %{
-          description:
-            "Burnt-out elevator shaft, the doors prised open and never closed since. Wind moves up the shaft."
-        }
-      )
+      Object.create(:room, "District One: Scrap Zone (West)", %{
+        description:
+          "Burnt-out elevator shaft, the doors prised open and never closed since. Wind moves up the shaft."
+      })
 
     # Connect rooms
     connect(safehouse, sz_center, "north")
@@ -108,38 +96,54 @@ defmodule LineCore.Seed.DistrictOne do
 
     # Fence NPC
     {:ok, fence} =
-      Object.create(:npc, "Hamid",
-        %{
-          description:
-            "A short, paunchy man in a stained workshirt. His hands are calloused; his eyes miss nothing. The kind of fence who weighs your scrap with his eyes before you've finished walking in."
-        }
-      )
+      Object.create(:npc, "Hamid", %{
+        description:
+          "A short, paunchy man in a stained workshirt. His hands are calloused; his eyes miss nothing. The kind of fence who weighs your scrap with his eyes before you've finished walking in."
+      })
 
     {:ok, _} = Object.relate(fence_shop.id, fence.id, :contains)
     Object.set_property(fence.id, "buys", ["scrap", "tool", "weapon"])
     Object.set_property(fence.id, "buy_multiplier", 1.0)
 
     # Starter items scattered in the scrap zone
-    seed_item(sz_center, "twisted pipe",
-      "A length of corroded steel pipe, threaded at one end.", 12, "scrap"
+    seed_item(
+      sz_center,
+      "twisted pipe",
+      "A length of corroded steel pipe, threaded at one end.",
+      12,
+      "scrap"
     )
 
-    seed_item(sz_n, "copper wire bundle",
-      "A few meters of stripped copper wire, kinked and dusty.", 8, "scrap"
+    seed_item(
+      sz_n,
+      "copper wire bundle",
+      "A few meters of stripped copper wire, kinked and dusty.",
+      8,
+      "scrap"
     )
 
-    seed_item(sz_e, "shattered display",
+    seed_item(
+      sz_e,
+      "shattered display",
       "What was once a flat-panel display. The glass is mostly gone; the controller board remains.",
-      18, "scrap"
+      18,
+      "scrap"
     )
 
-    seed_item(sz_w, "scrap pistol frame",
+    seed_item(
+      sz_w,
+      "scrap pistol frame",
       "The bare frame of a cheap automatic. No magazine, no slide, no trigger group. Salvageable.",
-      30, "weapon"
+      30,
+      "weapon"
     )
 
-    seed_item(sz_center, "bent crowbar",
-      "Steel crowbar, bent at the hook. Still useful as a weapon.", 15, "tool"
+    seed_item(
+      sz_center,
+      "bent crowbar",
+      "Steel crowbar, bent at the hook. Still useful as a weapon.",
+      15,
+      "tool"
     )
 
     # Make the crowbar a usable weapon — damage property

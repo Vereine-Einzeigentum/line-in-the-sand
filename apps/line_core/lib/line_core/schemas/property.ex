@@ -38,7 +38,8 @@ defmodule LineCore.Schemas.Property do
     belongs_to :object, Object
 
     field :key, :string
-    field :value, :map  # JSONB column, but :map is Ecto's idiom for it
+    # JSONB column, but :map is Ecto's idiom for it
+    field :value, :map
 
     timestamps(type: :utc_datetime_usec)
   end

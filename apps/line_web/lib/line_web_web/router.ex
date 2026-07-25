@@ -23,10 +23,10 @@ defmodule LineWebWeb.Router do
   scope "/api/playtest", LineWebWeb do
     pipe_through :api
 
-    post   "/sessions",              PlaytestController, :create
-    get    "/sessions/:token",       PlaytestController, :show
-    post   "/sessions/:token/cmd",   PlaytestController, :command
-    get    "/sessions/:token/feed",  PlaytestController, :feed
-    delete "/sessions/:token",       PlaytestController, :delete
+    post "/sessions", PlaytestController, :create
+    get "/sessions/:token", PlaytestController, :show
+    post "/sessions/:token/cmd", PlaytestController, :command
+    get "/sessions/:token/feed", PlaytestController, :feed
+    delete "/sessions/:token", PlaytestController, :delete
   end
 end

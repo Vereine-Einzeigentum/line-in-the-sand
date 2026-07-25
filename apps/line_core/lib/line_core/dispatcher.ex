@@ -101,7 +101,9 @@ defmodule LineCore.Dispatcher do
   defp apply_event_to_multi(multi, {:set_property, object_id, key, value}, _ctx) do
     stored = if is_map(value), do: value, else: %{"v" => value}
 
-    Multi.insert(multi, {:set_property, object_id, key, make_ref()},
+    Multi.insert(
+      multi,
+      {:set_property, object_id, key, make_ref()},
       %Property{}
       |> Property.changeset(%{object_id: object_id, key: key, value: stored}),
       on_conflict: [set: [value: stored, updated_at: DateTime.utc_now()]],
@@ -127,7 +129,8 @@ defmodule LineCore.Dispatcher do
       {:remove_old_container, object_id, make_ref()},
       from(r in Relationship, where: r.to_id == ^object_id and r.type == ^rel_type)
     )
-    |> Multi.insert({:move, object_id, to_container_id, make_ref()},
+    |> Multi.insert(
+      {:move, object_id, to_container_id, make_ref()},
       %Relationship{}
       |> Relationship.changeset(%{
         from_id: to_container_id,
@@ -138,7 +141,9 @@ defmodule LineCore.Dispatcher do
   end
 
   defp apply_event_to_multi(multi, {:relate, from_id, to_id, rel_type}, _ctx) do
-    Multi.insert(multi, {:relate, from_id, to_id, rel_type, make_ref()},
+    Multi.insert(
+      multi,
+      {:relate, from_id, to_id, rel_type, make_ref()},
       %Relationship{}
       |> Relationship.changeset(%{from_id: from_id, to_id: to_id, type: rel_type})
     )

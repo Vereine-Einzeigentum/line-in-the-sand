@@ -34,8 +34,7 @@ defmodule LineCore.Verbs.Drop do
          [
            {:move, item.id, ctx.room.id, :contains},
            {:notify_actor, "You drop the #{item.name}."},
-           {:notify_room, "#{ctx.actor.name} drops a #{item.name}.",
-            except: [ctx.actor.id]}
+           {:notify_room, "#{ctx.actor.name} drops a #{item.name}.", except: [ctx.actor.id]}
          ]}
     end
   end
