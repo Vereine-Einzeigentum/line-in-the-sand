@@ -86,6 +86,21 @@ defmodule LineCore.ParserTest do
     end
   end
 
+  describe "parse/1 — emote prefix" do
+    test "colon prefix routes to Emote" do
+      assert {:ok, Verbs.Emote, ["waves"]} = Parser.parse(":waves")
+    end
+
+    test "colon prefix with no action" do
+      assert {:ok, Verbs.Emote, [""]} = Parser.parse(":")
+    end
+
+    test "colon prefix preserves action description" do
+      assert {:ok, Verbs.Emote, ["grins mischievously"]} =
+               Parser.parse(":grins mischievously")
+    end
+  end
+
   describe "parse/1 — multi-word arguments" do
     test "get with multi-word item name" do
       assert {:ok, Verbs.Get, ["rusty knife"]} = Parser.parse("get rusty knife")
@@ -136,6 +151,25 @@ defmodule LineCore.ParserTest do
 
     test "who <player>" do
       assert {:ok, Verbs.Who, ["Graves"]} = Parser.parse("who Graves")
+    end
+  end
+
+  describe "parse/1 — score verb" do
+    test "score aliases all route to Score" do
+      assert {:ok, Verbs.Score, []} = Parser.parse("score")
+      assert {:ok, Verbs.Score, []} = Parser.parse("stats")
+      assert {:ok, Verbs.Score, []} = Parser.parse("sc")
+    end
+
+    test "score ignores trailing arguments" do
+      assert {:ok, Verbs.Score, []} = Parser.parse("score anything")
+    end
+  end
+
+  describe "parse/1 — emote verb aliases" do
+    test "emote verb aliases all route to Emote" do
+      assert {:ok, Verbs.Emote, ["waves"]} = Parser.parse("emote waves")
+      assert {:ok, Verbs.Emote, ["waves"]} = Parser.parse("me waves")
     end
   end
 

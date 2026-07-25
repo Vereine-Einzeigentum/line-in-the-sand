@@ -31,6 +31,8 @@ defmodule LineCore.Parser do
     "put" => Verbs.Drop,
     "discard" => Verbs.Drop,
     "say" => Verbs.Say,
+    "emote" => Verbs.Emote,
+    "me" => Verbs.Emote,
     "text" => Verbs.Text,
     "txt" => Verbs.Text,
     "tell" => Verbs.Text,
@@ -48,6 +50,9 @@ defmodule LineCore.Parser do
     "wield" => Verbs.Wield,
     "hold" => Verbs.Wield,
     "equip" => Verbs.Wield,
+    "score" => Verbs.Score,
+    "stats" => Verbs.Score,
+    "sc" => Verbs.Score,
 
     # Scrap loop
     "scrap" => Verbs.Scrap,
@@ -66,6 +71,10 @@ defmodule LineCore.Parser do
       String.starts_with?(trimmed, "\"") ->
         message = String.trim_leading(trimmed, "\"") |> String.trim()
         {:ok, Verbs.Say, [message]}
+
+      String.starts_with?(trimmed, ":") ->
+        message = String.trim_leading(trimmed, ":") |> String.trim()
+        {:ok, Verbs.Emote, [message]}
 
       String.downcase(trimmed) in @directions ->
         {:ok, Verbs.Go, [String.downcase(trimmed)]}
@@ -119,6 +128,7 @@ defmodule LineCore.Parser do
 
   defp parse_args(Verbs.Go, rest), do: [String.downcase(rest)]
   defp parse_args(Verbs.Inventory, _rest), do: []
+  defp parse_args(Verbs.Score, _rest), do: []
 
   defp parse_args(Verbs.Wield, rest) do
     case Regex.run(~r/^(.+?)\s+(main|off)$/i, rest) do

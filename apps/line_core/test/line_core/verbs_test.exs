@@ -2,7 +2,7 @@ defmodule LineCore.VerbsTest do
   use ExUnit.Case, async: false
 
   alias LineCore.{Object, Repo, TestHarness}
-  alias LineCore.Verbs.{Go, Get, Drop, Examine, Inventory, Say, Text, Who, Desc}
+  alias LineCore.Verbs.{Go, Get, Drop, Examine, Inventory, Say, Text, Who, Desc, Emote, Score}
 
   setup do
     Ecto.Adapters.SQL.Sandbox.checkout(Repo)
@@ -277,6 +277,100 @@ defmodule LineCore.VerbsTest do
       room = TestHarness.spawn_room("Hub")
       player = TestHarness.spawn_player_in(room)
       assert {:error, :empty_description} = TestHarness.dispatch(player, Desc, [""])
+    end
+  end
+
+  ## Emote
+
+  describe "Emote" do
+    test "broadcasts action to the room with actor name" do
+      room = TestHarness.spawn_room("Hub")
+      alice = TestHarness.spawn_player_in(room, "Alice")
+      bob = TestHarness.spawn_player_in(room, "Bob")
+
+      {:ok, events} =
+        Emote.execute(
+          %LineCore.Verb.Context{
+            actor: alice,
+            room: room,
+            room_contents: [alice, bob]
+          },
+          ["waves"]
+        )
+
+      assert events == [{:notify_room, "Alice waves"}]
+    end
+
+    test "includes the actor name in emote message" do
+      room = TestHarness.spawn_room("Hub")
+      alice = TestHarness.spawn_player_in(room, "Alice")
+
+      {:ok, events} =
+        Emote.execute(
+          %LineCore.Verb.Context{
+            actor: alice,
+            room: room,
+            room_contents: [alice]
+          },
+          ["grins mischievously"]
+        )
+
+      assert events == [{:notify_room, "Alice grins mischievously"}]
+    end
+
+    test "errors with no action" do
+      assert {:error, :emote_what} = Emote.execute(%LineCore.Verb.Context{}, [])
+    end
+
+    test "errors with empty message" do
+      assert {:error, :emote_what} = Emote.execute(%LineCore.Verb.Context{}, [""])
+    end
+  end
+
+  ## Score
+
+  describe "Score" do
+    test "shows HP and dirham to actor" do
+      room = TestHarness.spawn_room("Hub")
+      player = TestHarness.spawn_player_in(room)
+      Object.set_property(player.id, "hp_current", 30)
+      Object.set_property(player.id, "hp_max", 50)
+      Object.set_property(player.id, "dirham", 100)
+
+      TestHarness.dispatch(player, Score, [])
+
+      msg = TestHarness.assert_msg(~r/Character Sheet/)
+      assert msg =~ "30/50"
+      assert msg =~ "100"
+    end
+
+    test "shows default HP when not set" do
+      room = TestHarness.spawn_room("Hub")
+      player = TestHarness.spawn_player_in(room)
+
+      TestHarness.dispatch(player, Score, [])
+
+      msg = TestHarness.assert_msg(~r/Character Sheet/)
+      assert msg =~ "50/50"
+    end
+
+    test "shows stat and skill properties" do
+      room = TestHarness.spawn_room("Hub")
+      player = TestHarness.spawn_player_in(room)
+      Object.set_property(player.id, "stat_wire", 8)
+      Object.set_property(player.id, "skill_scrap", 5)
+
+      TestHarness.dispatch(player, Score, [])
+
+      msg = TestHarness.assert_msg(~r/Character Sheet/)
+      assert msg =~ "Wire: 8"
+      assert msg =~ "Scrap: 5"
+    end
+
+    test "errors with arguments" do
+      room = TestHarness.spawn_room("Hub")
+      player = TestHarness.spawn_player_in(room)
+      assert {:error, :bad_args} = TestHarness.dispatch(player, Score, ["arg"])
     end
   end
 end
