@@ -103,7 +103,7 @@ defmodule LineWebWeb.GameChannelTest do
     room = TestHarness.spawn_room("Stage")
     alice = TestHarness.spawn_player_in(room, "Alice")
     bob = TestHarness.spawn_player_in(room, "Bob")
-    socket_bob = connect_player(bob)
+    _socket_bob = connect_player(bob)
 
     # Alice says something via direct dispatcher call
     LineCore.Dispatcher.dispatch(alice.id, LineCore.Verbs.Say, ["hello"], "say hello")

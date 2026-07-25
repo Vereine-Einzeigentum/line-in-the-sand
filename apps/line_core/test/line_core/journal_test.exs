@@ -1,6 +1,8 @@
 defmodule LineCore.JournalTest do
   use ExUnit.Case, async: false
 
+  import Ecto.Query
+
   alias LineCore.{Dispatcher, Journal, Object, Repo}
   alias LineCore.Schemas.JournalEntry
 
@@ -57,7 +59,7 @@ defmodule LineCore.JournalTest do
 
     assert :ok = Dispatcher.dispatch(alice.id, MarkVerb, [item.id], "mark crate")
 
-    assert [entry] = Repo.all(JournalEntry)
+    assert [entry] = entries_for(alice.id)
     assert entry.actor_id == alice.id
     assert entry.room_id == room.id
     assert entry.verb == "mark_verb"
@@ -80,7 +82,7 @@ defmodule LineCore.JournalTest do
     Object.relate(room.id, player.id, :contains)
 
     assert {:error, :nope} = Dispatcher.dispatch(player.id, FailVerb, [], "fail")
-    assert Repo.all(JournalEntry) == []
+    assert entries_for(player.id) == []
   end
 
   test "a failed transaction rolls back the journal entry with the events" do
@@ -91,7 +93,7 @@ defmodule LineCore.JournalTest do
     result = Dispatcher.dispatch(player.id, BadVerb, [], "bad")
 
     refute match?(:ok, result)
-    assert Repo.all(JournalEntry) == []
+    assert entries_for(player.id) == []
   end
 
   test "journal entries preserve dispatch order" do
@@ -104,9 +106,7 @@ defmodule LineCore.JournalTest do
     assert :ok = Dispatcher.dispatch(alice.id, MarkVerb, [item.id], "first")
     assert :ok = Dispatcher.dispatch(alice.id, MarkVerb, [item.id], "second")
 
-    import Ecto.Query
-    raws = Repo.all(from(j in JournalEntry, order_by: j.id, select: j.raw))
-    assert raws == ["first", "second"]
+    assert Enum.map(entries_for(alice.id), & &1.raw) == ["first", "second"]
   end
 
   test "serialize/1 makes event payloads JSONB-safe" do
@@ -121,5 +121,12 @@ defmodule LineCore.JournalTest do
   test "verb_name/1 derives journal names from modules" do
     assert Journal.verb_name(LineCore.Verbs.Get) == "get"
     assert Journal.verb_name(LineCore.Verbs.Look) == "look"
+  end
+
+  # Every dispatch anywhere in the suite journals, and the sandbox runs in
+  # :auto mode, so assertions must be scoped to this test's own actor rather
+  # than the whole table.
+  defp entries_for(actor_id) do
+    Repo.all(from(j in JournalEntry, where: j.actor_id == ^actor_id, order_by: j.id))
   end
 end

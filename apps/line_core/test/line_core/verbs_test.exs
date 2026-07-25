@@ -195,7 +195,7 @@ defmodule LineCore.VerbsTest do
       room_a = TestHarness.spawn_room("Room A")
       room_b = TestHarness.spawn_room("Room B")
       alice = TestHarness.spawn_player_in(room_a, "Alice")
-      bob = TestHarness.spawn_player_in(room_b, "Bob")
+      _bob = TestHarness.spawn_player_in(room_b, "Bob")
 
       TestHarness.dispatch(alice, Text, ["Bob", "are you there"])
 
