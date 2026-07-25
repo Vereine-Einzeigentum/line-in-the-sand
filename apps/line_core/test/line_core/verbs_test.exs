@@ -2,6 +2,7 @@ defmodule LineCore.VerbsTest do
   use ExUnit.Case, async: false
 
   alias LineCore.{Object, Repo, TestHarness}
+
   alias LineCore.Verbs.{
     Go,
     Get,
@@ -387,6 +388,7 @@ defmodule LineCore.VerbsTest do
       assert {:error, :bad_args} = TestHarness.dispatch(player, Score, ["arg"])
     end
   end
+
   ## Give
 
   describe "Give" do
