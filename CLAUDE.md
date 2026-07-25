@@ -233,6 +233,13 @@ name). New canonical content goes in `apps/line_core/lib/line_core/seed/`.
   without explicit permission.
 - Commits in this repo follow Conventional-Commit-ish prefixes
   (`feat(line_core): ...`, `scaffold: ...`).
+- **No AI attribution or signing.** Do not add `Co-Authored-By` trailers,
+  "Generated with ..." footers, session links, or any tool self-attribution to
+  commits, PR titles/bodies, comments, or code. Commit messages describe the
+  change and nothing else.
+- **No timers.** Agents must not schedule wake-ups, self check-ins, reminders,
+  or any other time-based follow-up (e.g. `send_later`, cron-style routines).
+  React to events (CI, reviews, pushes) as they arrive; otherwise stay quiet.
 - Historical context lives in `SCAFFOLD_REPORT.md`, `INTEGRATION_REPORT.md`, and
   `apps/line_core/INTEGRATION.md` — useful for understanding how the spine was
   assembled, but they describe past phases, not current tasks.
