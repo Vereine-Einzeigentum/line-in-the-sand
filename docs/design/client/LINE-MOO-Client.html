@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark" data-anim="on">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>LINE — Client</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+Arabic:wght@400;600&family=Noto+Sans+SC:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --void:#0d0a14; --void-2:#141020; --panel:#181222; --panel-2:#1f1730;
+  --line:#2c2340; --line-2:#3a2f52;
+  --amber:#ffb648; --amber-dim:#b9823a;
+  --cyan:#52d4e0; --cyan-dim:#357f88;
+  --magenta:#ff5aa6; --green:#6fe39f; --red:#ff5a52;
+  --gold:#d4a93f; --mosque:#2f6aa8;
+  --ember:#ff8a3d; --rust:#a8602f; --jade:#5b9c6a; --chop:#cf3a2e; --sand:#c2a878;
+  --text:#d9d0ea; --text-dim:#867a9e; --text-faint:#574d6b;
+  --bg:var(--void); --fg:var(--text);
+  --feed-bg:var(--void); --panel-bg:var(--panel);
+  --scan-op:0.22; --glow:0 0 8px;
+  --mono:'JetBrains Mono',ui-monospace,monospace;
+}
+html[data-theme="light"]{
+  /* Boundless cream — the client goes paper when you stand on ground they own */
+  --void:#efe7d3; --void-2:#e8dec5; --panel:#f4eedd; --panel-2:#ece2cb;
+  --line:#d8cba8; --line-2:#c8b78c;
+  --amber:#b8701a; --amber-dim:#caa05a;
+  --cyan:#1d7d8a; --cyan-dim:#5ba3ac;
+  --magenta:#c0327a; --green:#2e8d54; --red:#c4392f;
+  --gold:#9c7414; --mosque:#2f6aa8;
+  --text:#221c12; --text-dim:#6b5f44; --text-faint:#a99a76;
+  --scan-op:0.05; --glow:0 0 0;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--void); color:var(--text);
+  font-family:var(--mono); font-size:13px; line-height:1.5;
+  overflow:hidden; -webkit-font-smoothing:antialiased;
+  position:relative;
+}
+/* CRT scanline overlay */
+#crt{position:fixed;inset:0;pointer-events:none;z-index:90;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,var(--scan-op)) 0 1px,transparent 1px 3px);
+  mix-blend-mode:multiply;}
+html[data-theme="light"] #crt{mix-blend-mode:normal;background:repeating-linear-gradient(0deg,rgba(120,100,60,var(--scan-op)) 0 1px,transparent 1px 3px);}
+#vig{position:fixed;inset:0;pointer-events:none;z-index:89;
+  background:radial-gradient(120% 90% at 50% 40%,transparent 55%,rgba(0,0,0,0.55));}
+html[data-theme="light"] #vig{background:radial-gradient(120% 90% at 50% 40%,transparent 60%,rgba(120,100,60,0.14));}
+html[data-anim="off"] #crt,html[data-anim="off"] #flick{display:none}
+#flick{position:fixed;inset:0;pointer-events:none;z-index:91;background:rgba(255,200,120,0.015);animation:flick 6s steps(2) infinite}
+@keyframes flick{0%,97%,100%{opacity:0}98%{opacity:1}}
+
+.app{display:flex;flex-direction:column;height:100%;height:100dvh;position:relative;z-index:10}
+
+/* ===== TOP BAR ===== */
+header{display:flex;gap:8px;padding:8px;border-bottom:1px solid var(--line);
+  background:linear-gradient(180deg,var(--panel),var(--void));flex:none}
+.minimap{flex:none;width:112px;border:1px solid var(--line-2);background:#0b0810;
+  padding:5px 6px 6px;border-radius:2px;position:relative}
+.minimap .mm-grid{font-size:12px;line-height:1.02;letter-spacing:2px;white-space:pre;text-align:center;font-family:var(--mono)}
+.minimap .here{color:var(--amber);text-shadow:var(--glow) var(--amber)}
+.minimap .lbl{position:absolute;top:-1px;right:3px;font-size:8px;color:var(--text-faint);letter-spacing:1px}
+.minimap .coord{font-size:8px;color:var(--amber-dim);text-align:center;margin-top:3px;letter-spacing:1px}
+
+.status{flex:1;display:flex;flex-direction:column;gap:5px;min-width:0}
+.srow{display:flex;gap:6px}
+/* HellMOO-style bracket meters: HP keeps full, fatigue/stress keep empty */
+.meters{display:flex;flex-direction:column;gap:3px}
+.meter{display:flex;align-items:center;gap:7px;font-family:var(--mono);line-height:1}
+.meter .ml{width:52px;font-size:9px;letter-spacing:1px;color:var(--text-dim);text-transform:uppercase;text-align:right;flex:none}
+.meter .mt{font-size:14px;letter-spacing:0;white-space:pre;flex:1;min-width:0;overflow:hidden}
+.meter .mt .br{color:var(--text-faint)}
+.meter .mt .e{color:var(--line-2)}
+.meter .mv{font-size:10px;color:var(--text-dim);width:28px;flex:none;text-align:right}
+.sig{display:flex;align-items:center;gap:5px}
+.sig .bars{display:flex;align-items:flex-end;gap:1.5px;height:13px}
+.sig .bars b{width:3px;background:var(--cyan);box-shadow:var(--glow) var(--cyan);opacity:.25;border-radius:1px}
+.sig .bars b.on{opacity:1}
+.sig .lvl{font-size:11px;color:var(--cyan);font-weight:700}
+.sig .spd{font-size:8px;color:var(--text-faint);letter-spacing:.5px}
+.money{font-size:14px;color:var(--gold);font-weight:700;white-space:nowrap;display:flex;align-items:baseline;gap:4px}
+.money small{font-size:8px;color:var(--text-faint);font-weight:400;letter-spacing:.5px}
+.facs{display:flex;gap:5px}
+.fac{flex:1;border:1px solid var(--line);border-radius:2px;padding:2px 6px;background:var(--void-2);
+  display:flex;align-items:center;gap:6px;min-width:0}
+.fac .g{font-family:'Noto Sans SC',var(--mono);font-size:14px;line-height:1;flex:none}
+.fac .meta{min-width:0;flex:1}
+.fac .nm{font-size:8px;color:var(--text-dim);letter-spacing:.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fac .cl{font-size:11px;font-weight:700;color:var(--text-dim)}
+.fac .cl.pos{color:var(--green)} .fac .cl.neg{color:var(--ember)}
+
+/* ===== MAIN FEED ===== */
+.body{flex:1;display:flex;min-height:0;position:relative;--dw:min(300px,84vw)}
+.feed{flex:1;overflow-y:auto;padding:12px 14px 14px;scrollbar-width:thin;scrollbar-color:var(--line-2) transparent}
+.feed::-webkit-scrollbar{width:6px} .feed::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:3px}
+.ev{margin-bottom:10px;opacity:1}
+html[data-anim="on"] .ev{animation:appear .25s ease}
+@keyframes appear{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.ev{animation:none!important}}
+.ev .t{font-size:8px;color:var(--text-faint);letter-spacing:1px;margin-bottom:1px}
+.room{border-left:2px solid var(--amber-dim);padding-left:10px;margin-bottom:12px}
+.room h2{font-size:13px;color:var(--amber);letter-spacing:1px;text-shadow:var(--glow) var(--amber);margin-bottom:4px;font-weight:700;text-transform:uppercase}
+.room .desc{color:var(--text);font-size:13px}
+.room .exits{margin-top:6px;font-size:11px;color:var(--text-dim)}
+.room .exits b{color:var(--cyan)}
+.room .here{margin-top:5px;font-size:11px;color:var(--text-dim)}
+.room .here b{color:var(--amber)}
+.line .who{color:var(--amber);font-weight:500}
+.line.sys{color:var(--cyan)} .line.sys::before{content:"» ";color:var(--cyan-dim)}
+.line.you .who{color:var(--green)}
+.line.warn{color:var(--magenta)} .line.warn::before{content:"!! ";color:var(--magenta)}
+.line.bdl{color:var(--gold);border-left:2px solid var(--gold);padding-left:8px;background:linear-gradient(90deg,rgba(212,169,63,.06),transparent)}
+.line.emote{color:var(--text-dim);font-style:italic}
+.tag{display:inline-block;font-size:9px;padding:0 4px;border:1px solid var(--line-2);border-radius:2px;color:var(--text-dim);letter-spacing:.5px;vertical-align:1px}
+.art-chip{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--cyan-dim);background:var(--void-2);
+  border-radius:2px;padding:2px 7px;color:var(--cyan);cursor:pointer;font-size:11px;margin-top:3px}
+.art-chip:hover{background:var(--panel-2)}
+.art-chip .px{width:11px;height:11px;background:
+  conic-gradient(var(--amber) 25%,var(--magenta) 0 50%,var(--cyan) 0 75%,var(--green) 0);image-rendering:pixelated}
+
+/* ===== COMMS DRAWER ===== */
+.comms{position:absolute;top:0;left:0;bottom:0;width:300px;max-width:84vw;z-index:40;
+  background:var(--panel);border-right:1px solid var(--line-2);
+  display:flex;flex-direction:column;transform:translateX(-103%);transition:transform .26s cubic-bezier(.4,0,.2,1);
+  box-shadow:8px 0 30px rgba(0,0,0,.5)}
+.comms.open{transform:none}
+.comms .ch{display:flex;border-bottom:1px solid var(--line);flex:none}
+.comms .ch button{flex:1;background:none;border:none;color:var(--text-faint);font-family:var(--mono);
+  font-size:10px;letter-spacing:.5px;padding:8px 4px;cursor:pointer;border-bottom:2px solid transparent}
+.comms .ch button.on{color:var(--amber);border-bottom-color:var(--amber)}
+.comms .ch .badge{display:inline-block;background:var(--magenta);color:#fff;font-size:8px;border-radius:6px;padding:0 4px;margin-left:3px}
+.comms .head{display:flex;align-items:center;justify-content:space-between;padding:7px 10px;border-bottom:1px solid var(--line);flex:none}
+.comms .head .ttl{font-size:9px;letter-spacing:1.5px;color:var(--text-dim);text-transform:uppercase}
+.comms .head .x{background:none;border:1px solid var(--line-2);color:var(--text-dim);border-radius:2px;width:22px;height:22px;cursor:pointer;font-size:13px}
+.comms .stream{flex:1;overflow-y:auto;padding:9px 10px;scrollbar-width:thin;scrollbar-color:var(--line-2) transparent}
+.comms .stream::-webkit-scrollbar{width:5px}.comms .stream::-webkit-scrollbar-thumb{background:var(--line-2)}
+.cmsg{margin-bottom:8px;font-size:12px;line-height:1.45}
+.cmsg .h{font-size:9px;color:var(--text-faint);letter-spacing:.5px;display:flex;gap:6px;margin-bottom:1px}
+.cmsg .h .u{font-weight:700}
+.cmsg .h .u.ar{font-family:'Noto Sans Arabic',var(--mono)}
+.u1{color:var(--amber)}.u2{color:var(--cyan)}.u3{color:var(--magenta)}.u4{color:var(--green)}.u5{color:var(--gold)}
+.cmsg .b{color:var(--text)}
+.comms .csend{display:flex;gap:6px;padding:8px;border-top:1px solid var(--line);flex:none}
+.comms .csend input{flex:1;background:var(--void-2);border:1px solid var(--line-2);color:var(--text);
+  font-family:var(--mono);font-size:12px;padding:7px 9px;border-radius:2px;outline:none}
+.comms .csend input:focus{border-color:var(--amber-dim)}
+.comms .csend button{background:var(--amber-dim);border:none;color:#1a0f00;font-weight:700;padding:0 11px;border-radius:2px;cursor:pointer;font-family:var(--mono)}
+
+/* ===== BOTTOM INPUT ===== */
+.dock{flex:none;border-top:1px solid var(--line);background:linear-gradient(0deg,var(--panel),var(--void));padding:7px 8px}
+.qbar{display:flex;gap:5px;margin-bottom:6px;overflow-x:auto;scrollbar-width:none}
+.qbar::-webkit-scrollbar{display:none}
+.qbar button{flex:none;background:var(--void-2);border:1px solid var(--line-2);color:var(--text-dim);
+  font-family:var(--mono);font-size:10px;padding:4px 9px;border-radius:2px;cursor:pointer;letter-spacing:.5px;white-space:nowrap}
+.qbar button:hover{border-color:var(--amber-dim);color:var(--amber)}
+.entry{display:flex;align-items:flex-end;gap:7px;border:1px solid var(--line-2);background:var(--void-2);border-radius:3px;padding:6px 8px}
+.entry:focus-within{border-color:var(--amber);box-shadow:0 0 0 1px var(--amber-dim) inset}
+.entry .pr{color:var(--amber);font-weight:700;padding-top:2px}
+.entry textarea{flex:1;background:none;border:none;color:var(--text);font-family:var(--mono);font-size:13px;
+  resize:none;outline:none;line-height:1.4;max-height:120px;overflow-y:auto}
+.entry textarea::placeholder{color:var(--text-faint)}
+.entry .send{background:none;border:none;color:var(--amber);cursor:pointer;font-size:16px;padding:0 2px;align-self:center}
+
+/* corner buttons */
+.fab{position:absolute;z-index:45;width:38px;height:38px;border-radius:3px;border:1px solid var(--line-2);
+  background:var(--panel);color:var(--text-dim);cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center}
+.fab:hover{color:var(--amber);border-color:var(--amber-dim)}
+.fab.comms-btn{top:8px;left:8px;display:none;transition:transform .26s cubic-bezier(.4,0,.2,1)}
+.fab.opts-btn{bottom:64px;right:10px}
+
+/* ===== AI ART POPUP ===== */
+.artwin{position:absolute;z-index:60;width:240px;background:var(--panel);border:1px solid var(--line-2);
+  border-radius:3px;box-shadow:0 12px 40px rgba(0,0,0,.6);display:flex;flex-direction:column;overflow:hidden}
+.artwin .bar{display:flex;align-items:center;justify-content:space-between;padding:6px 8px;
+  background:var(--panel-2);border-bottom:1px solid var(--line);cursor:grab;user-select:none}
+.artwin .bar.drag{cursor:grabbing}
+.artwin .bar .ti{font-size:9px;letter-spacing:1px;color:var(--text-dim);text-transform:uppercase}
+.artwin .bar .x{background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:14px;line-height:1;padding:0 2px}
+.artwin .bar .x:hover{color:var(--red)}
+.artwin .canvas{aspect-ratio:1;background:var(--void-2);position:relative;overflow:hidden;image-rendering:pixelated}
+.artwin .canvas.gen::after{content:"GENERATING ▒▒▒░░░";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-size:10px;letter-spacing:1px;color:var(--cyan);background:var(--void-2);animation:pulse 1s steps(4) infinite}
+@keyframes pulse{50%{opacity:.4}}
+.artwin .meta{padding:7px 9px;border-top:1px solid var(--line)}
+.artwin .meta .nm{font-size:12px;color:var(--amber);font-weight:700}
+.artwin .meta .sub{font-size:9px;color:var(--text-dim);margin-top:2px;line-height:1.4}
+.artwin .meta .stats{display:flex;flex-wrap:wrap;gap:3px;margin-top:6px}
+.artwin .meta .stats span{font-size:9px;border:1px solid var(--line-2);border-radius:2px;padding:1px 5px;color:var(--text-dim)}
+.artwin .meta .stats span b{color:var(--cyan)}
+
+/* ===== OPTIONS MODAL ===== */
+.scrim{position:absolute;inset:0;z-index:70;background:rgba(5,3,10,.7);backdrop-filter:blur(2px);
+  display:none;align-items:center;justify-content:center;padding:18px}
+.scrim.open{display:flex}
+.opts{width:330px;max-width:100%;background:var(--panel);border:1px solid var(--line-2);border-radius:4px;overflow:hidden}
+.opts .oh{display:flex;align-items:center;justify-content:space-between;padding:11px 13px;border-bottom:1px solid var(--line);background:var(--panel-2)}
+.opts .oh .t{font-size:11px;letter-spacing:2px;color:var(--amber);text-transform:uppercase}
+.opts .oh .chop{font-family:'Noto Sans SC',serif;color:var(--red);font-size:15px;border:1px solid var(--gold);border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center}
+.opts .ob{padding:6px 13px 13px}
+.orow{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--line)}
+.orow:last-child{border-bottom:none}
+.orow .ol{font-size:12px;color:var(--text)}
+.orow .od{font-size:9px;color:var(--text-faint);margin-top:2px}
+.seg{display:flex;border:1px solid var(--line-2);border-radius:3px;overflow:hidden}
+.seg button{background:var(--void-2);border:none;color:var(--text-dim);font-family:var(--mono);font-size:10px;
+  padding:6px 11px;cursor:pointer;letter-spacing:.5px}
+.seg button.on{background:var(--amber-dim);color:#1a0f00;font-weight:700}
+.opts .ofoot{padding:9px 13px;border-top:1px solid var(--line);font-size:8px;color:var(--text-faint);letter-spacing:.5px;
+  display:flex;justify-content:space-between;background:var(--void-2)}
+
+/* desktop */
+@media(min-width:860px){
+  .fab.comms-btn{display:none!important}
+  .comms{position:relative;transform:none!important;max-width:none;width:280px;box-shadow:none;flex:none}
+  .body{}
+  header{padding:10px}
+  .minimap{width:120px}
+  body{font-size:13px}
+  .feed{padding:16px 22px}
+  .dock{padding:9px 16px}
+}
+@media(max-width:859px){
+  .fab.comms-btn{display:flex}
+  /* push, not overlay: feed + menu button slide with the drawer */
+  .comms{box-shadow:none}
+  .body.shift .feed{transform:translateX(var(--dw))}
+  .body.shift .comms-btn{transform:translateX(var(--dw))}
+  .feed{transition:transform .26s cubic-bezier(.4,0,.2,1)}
+}
+</style>
+</head>
+<body>
+<div id="crt"></div><div id="vig"></div><div id="flick"></div>
+
+<div class="app">
+  <!-- TOP BAR -->
+  <header>
+    <div class="minimap">
+      <span class="lbl">SCRAP ZONE</span>
+      <div class="mm-grid" id="mmGrid"></div>
+      <div class="coord">SECTOR 14 · LVL-03</div>
+    </div>
+    <div class="status">
+      <div class="meters" id="meters"></div>
+      <div class="srow" style="align-items:center">
+        <div class="sig" title="SIGNAL — mean of up/down throughput; your standing in the mesh">
+          <div class="bars" id="sigBars"></div>
+          <div><div class="lvl">SIG 47</div><div class="spd">↑12.4 ↓31.8 Mb</div></div>
+        </div>
+        <div style="flex:1"></div>
+        <div class="money"><span style="unicode-bidi:isolate">312</span> <small>dirham</small></div>
+      </div>
+      <div class="facs">
+        <div class="fac"><span class="g" style="color:var(--chop)">淼</span><div class="meta"><div class="nm">THE BOUNDLESS</div><div class="cl pos">+3 ▲</div></div></div>
+        <div class="fac"><span class="g" style="color:var(--sand)">★</span><div class="meta"><div class="nm">DISTRICT POLICE</div><div class="cl neg">−7 ▼</div></div></div>
+      </div>
+    </div>
+  </header>
+
+  <!-- BODY -->
+  <div class="body">
+    <button class="fab comms-btn" id="commsBtn" title="Global comms">☰</button>
+    <button class="fab opts-btn" id="optsBtn" title="Options">⚙</button>
+
+    <!-- COMMS DRAWER -->
+    <aside class="comms" id="comms">
+      <div class="ch" id="chTabs">
+        <button class="on" data-ch="global">GLOBAL</button>
+        <button data-ch="sector">SECTOR</button>
+        <button data-ch="union">UNION<span class="badge">3</span></button>
+      </div>
+      <div class="head"><span class="ttl" id="chTitle">GLOBAL COMMS · 9.2M ONLINE</span>
+        <button class="x" id="commsClose">×</button></div>
+      <div class="stream" id="commsStream"></div>
+      <div class="csend"><input id="commsInput" placeholder="message global…"><button id="commsSend">↵</button></div>
+    </aside>
+
+    <!-- LOCAL FEED -->
+    <main class="feed" id="feed"></main>
+  </div>
+
+  <!-- DOCK -->
+  <div class="dock">
+    <div class="qbar">
+      <button data-cmd="look">look</button>
+      <button data-cmd="north">go north</button>
+      <button data-cmd="examine vendor">examine vendor</button>
+      <button data-cmd="inventory">inventory</button>
+      <button data-cmd="scan">scan signal</button>
+      <button data-cmd="say">say…</button>
+    </div>
+    <div class="entry">
+      <span class="pr">›</span>
+      <textarea id="cmd" rows="1" placeholder="type a command…  (look, go north, say hi)"></textarea>
+      <button class="send" id="cmdSend">▸</button>
+    </div>
+  </div>
+</div>
+
+<!-- OPTIONS -->
+<div class="scrim" id="scrim">
+  <div class="opts">
+    <div class="oh"><span class="t">System · 设置</span><span class="chop">淼</span></div>
+    <div class="ob">
+      <div class="orow"><div><div class="ol">Display mode</div><div class="od">Cream = Boundless-owned ground</div></div>
+        <div class="seg" id="segTheme"><button data-v="dark" class="on">DARK</button><button data-v="light">CREAM</button></div></div>
+      <div class="orow"><div><div class="ol">Animations</div><div class="od">Scanlines, flicker, message reveal</div></div>
+        <div class="seg" id="segAnim"><button data-v="on" class="on">ON</button><button data-v="off">OFF</button></div></div>
+      <div class="orow"><div><div class="ol">Feed density</div><div class="od">Lines per event block</div></div>
+        <div class="seg" id="segDens"><button data-v="dense" class="on">DENSE</button><button data-v="roomy">ROOMY</button></div></div>
+    </div>
+    <div class="ofoot"><span>淼 رسوم العهود · CLIENT v0.9</span><span id="clock">--:--</span></div>
+  </div>
+</div>
+
+<script>
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const root=document.documentElement;
+
+/* ---------- MINIMAP (unicode box-drawing) ---------- */
+/* ---------- HP / FATIGUE / STRESS — HellMOO bracket meters ---------- */
+/* HP keeps full (good when high); fatigue + stress keep empty (bad when high) */
+const METERS=[
+ {k:'HP', val:62, keep:'full'},
+ {k:'FATIGUE', val:78, keep:'empty'},
+ {k:'STRESS', val:41, keep:'empty'},
+];
+function meterColor(m){
+ if(m.keep==='full') return m.val<28?'var(--red)':m.val<55?'var(--ember)':'var(--amber)';
+ return m.val>70?'var(--red)':m.val>45?'var(--ember)':'var(--cyan-dim)';
+}
+function renderMeters(){
+ const host=$("#meters"); if(!host) return; host.innerHTML="";
+ const N=12;
+ METERS.forEach(m=>{
+  const fill=Math.max(0,Math.min(N,Math.round(m.val/100*N)));
+  const blk=`<span style="color:${meterColor(m)}">${'\u2588'.repeat(fill)}</span><span class="e">${'\u2591'.repeat(N-fill)}</span>`;
+  host.insertAdjacentHTML('beforeend',
+   `<div class="meter"><span class="ml">${m.k}</span><span class="mt"><span class="br">[</span>${blk}<span class="br">]</span></span><span class="mv">${m.val}</span></div>`);
+ });
+}
+renderMeters();
+
+/* ---------- MINIMAP — bird's-eye, colored, unicode (Scrap Zone) ---------- */
+/* glyph legend: ◉ you · ▣ room · ░ dust · ≈ coolant · ▨ scrap pile · █ wall · ↓ stair */
+const here={x:3,y:2};
+const MM=[
+ "███████",
+ "█░▨░≈░█",
+ "█▣▣◉▣░█",
+ "█░≈▣▨░█",
+ "█░▣░░░█",
+ "██↓████",
+ "       ",
+];
+const MM_COL={'█':'var(--line-2)','░':'var(--text-faint)','≈':'var(--cyan-dim)','▨':'var(--rust)','▣':'var(--text-dim)','↓':'var(--jade)'};
+function mm(){
+ let out="";
+ for(let y=0;y<MM.length;y++){
+  for(let x=0;x<MM[y].length;x++){
+   const c=MM[y][x];
+   if(x===here.x&&y===here.y){out+='<span class="here">\u25c9</span>';continue;}
+   if(c===' '){out+=' ';continue;}
+   out+=`<span style="color:${MM_COL[c]||'var(--text-faint)'}">${c}</span>`;
+  }
+  out+="\n";
+ }
+ $("#mmGrid").innerHTML=out;
+}
+mm();
+
+/* signal bars */
+const sig=47; const bars=$("#sigBars");
+for(let i=0;i<6;i++){const b=document.createElement("b");b.style.height=(5+i*1.6)+"px";if(i< Math.round(sig/100*6))b.classList.add("on");bars.appendChild(b);}
+
+/* ---------- LOCAL FEED ---------- */
+const feed=$("#feed");
+function now(){const d=new Date();return d.toTimeString().slice(0,8);}
+function pushRoom(){
+ const el=document.createElement("div");el.className="room";
+ el.innerHTML=`<h2>◢ Manfouha Underwalk · Scrap Tier</h2>
+  <div class="desc">Sodium-orange light pools on wet concrete. A power-loom hums somewhere above, felt in the teeth more than heard. Coolant runs cyan-green in the floor channel. Rust eats every railing. Two figures crouch over a gutted drone, trading low Urdu.</div>
+  <div class="exits">exits: <b>north</b> (fence shop) · <b>east</b> (loom gallery) · <b>down</b> (utility) · <b>up</b> (souk stair)</div>
+  <div class="here">here: <b>Naseer</b> the fence · <b>a loom-runner</b> · you</div>`;
+ feed.appendChild(el);
+}
+function pushLine(html,cls=""){const e=document.createElement("div");e.className="ev";
+ e.innerHTML=`<div class="t">${now()}</div><div class="line ${cls}">${html}</div>`;feed.appendChild(e);scroll();}
+function scroll(){feed.scrollTop=feed.scrollHeight;}
+
+pushRoom();
+pushLine('<span class="who">Naseer</span> turns a cracked neural-core over in his hands. "This one\'s still warm, friend. Three restorations off true. I can read it, but it\'ll cost you signal."','');
+pushLine('A loom-runner spits. <span class="emote">— she does not trust you yet —</span>','emote');
+pushLine('Boundless maintenance bay #14 reports your VIT scan is <b>11 days</b> overdue. Restoration credit: secured.','bdl');
+pushLine('Tap to view the fence\'s portrait: <span class="art-chip" data-art="naseer"><span class="px"></span>render NASEER · lowpoly</span>','');
+pushLine('Naseer slides a <b>coolant-etched blade</b> across the bench. <span class="art-chip" data-art="blade"><span class="px"></span>render ITEM · 2D</span>','');
+
+/* ---------- COMMS ---------- */
+const commsData={
+ global:[
+  ["1","Dunya_7","نور المدينة","ar","anyone got a clean core in sector 14? mine\'s 4 off true and the hands shake"],
+  ["2","loom_bao","保","","Surat tier flooded again. coolant up to the ankle. third time this cycle 🌊"],
+  ["3","Naseer_fence","","","I read cores. fair signal rates. underwalk, sector 14. don\'t bring Union."],
+  ["4","amma_riz","","","my granddaughter signed today. four generations. she didn\'t even read the العهود. 💔"],
+  ["5","ghost0x","","","they smoothed the souk floor overnight. Boundless owns it now. watch your step."],
+  ["1","Dunya_7","نور المدينة","ar","@Naseer_fence omw. bringing 30 signal"],
+ ],
+ sector:[
+  ["2","blockwatch","","","loom gallery east is safe tonight. runner counts clean."],
+  ["3","tariq_dl","","","selling sand-route maps. exterior. for those with nothing left to lose."],
+  ["4","Naseer_fence","","","sector quiet. good. keep it that way."],
+ ],
+ union:[
+  ["3","联防_node","联","","DUES. underwalk tier. you know the count."],
+  ["3","联防_node","联","","your clout fell to −7. one more and we read YOUR core."],
+  ["5","broker_ling","","","i can fix your standing. it won\'t be cheap and it won\'t be clean."],
+ ]
+};
+let ch="global";
+function renderComms(){
+ const s=$("#commsStream");s.innerHTML="";
+ commsData[ch].forEach(([u,name,native,ar,body])=>{
+  const d=document.createElement("div");d.className="cmsg";
+  d.innerHTML=`<div class="h"><span class="u u${u} ${ar?'ar':''}">${native||name}</span>
+   ${native?`<span style="color:var(--text-faint)">@${name}</span>`:''}</div><div class="b">${body}</div>`;
+  s.appendChild(d);
+ });
+ s.scrollTop=s.scrollHeight;
+ const titles={global:"GLOBAL COMMS · 9.2M ONLINE",sector:"SECTOR 14 · 312 ONLINE",union:"UNION 联防 · PRIVATE"};
+ $("#chTitle").textContent=titles[ch];
+}
+renderComms();
+$("#chTabs").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;
+ $$("#chTabs button").forEach(x=>x.classList.remove("on"));b.classList.add("on");ch=b.dataset.ch;renderComms();});
+const comms=$("#comms");
+const commsToggle=open=>{comms.classList.toggle("open",open);document.querySelector(".body").classList.toggle("shift",open);};
+$("#commsBtn").onclick=()=>commsToggle(!comms.classList.contains("open"));
+$("#commsClose").onclick=()=>commsToggle(false);
+function sendComms(){const i=$("#commsInput");if(!i.value.trim())return;
+ commsData[ch].push(["4","you","","","",i.value.trim()]);
+ // store as plain
+ commsData[ch][commsData[ch].length-1]=["4","you","","",i.value.trim()];
+ i.value="";renderComms();}
+$("#commsSend").onclick=sendComms;
+$("#commsInput").addEventListener("keydown",e=>{if(e.key==="Enter")sendComms();});
+
+/* ---------- COMMAND INPUT ---------- */
+const cmd=$("#cmd");
+function autores(){cmd.style.height="auto";cmd.style.height=Math.min(cmd.scrollHeight,120)+"px";}
+cmd.addEventListener("input",autores);
+function run(raw){
+ const t=raw.trim();if(!t)return;
+ pushLine(`<span class="who you">you</span> › ${t}`,'you');
+ const w=t.toLowerCase();
+ if(w==="look"){pushRoom();scroll();}
+ else if(w.startsWith("go ")||["north","south","east","west","up","down"].includes(w)){
+  pushLine(`You move ${w.replace('go ','')}. The scanlines stutter as the sector handoff completes.`,'sys');
+  here.x=Math.max(0,Math.min(6,here.x+(w.includes('east')?1:w.includes('west')?-1:0)));
+  here.y=Math.max(0,Math.min(6,here.y+(w.includes('north')?-1:w.includes('south')?1:0)));mm();}
+ else if(w.startsWith("say")){pushLine(`<span class="who you">you say</span>, "${t.slice(3).trim()||'…'}"`,'you');}
+ else if(w.startsWith("examine")||w.startsWith("look at")){pushLine('Naseer is older than four generations should allow. The amber bulb underlights a face that has been restored too many times — the geometry of him is a little off true, polygons not quite meeting at the jaw.','sys');}
+ else if(w==="inventory"){pushLine('You carry: <b>30 signal-chits</b> · a cracked neural-core (4 off true) · half a loom-shuttle · prayer beads, lapis · ৳1,240 riyal-coin.','sys');}
+ else if(w==="scan"){pushLine('SIGNAL 47 — mean throughput ↑12.4 ↓31.8 Mb. You are mid-mesh. Boundless can see you but isn\'t looking. Yet.','sys');}
+ else{pushLine(`The world does not understand "<b>${t}</b>". Try: look · go &lt;dir&gt; · examine &lt;x&gt; · say &lt;msg&gt;`,'warn');}
+ cmd.value="";autores();
+}
+$("#cmdSend").onclick=()=>run(cmd.value);
+cmd.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();run(cmd.value);}});
+$(".qbar").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;
+ const c=b.dataset.cmd;if(c==="say"){cmd.value="say ";cmd.focus();autores();}else run(c);});
+
+/* ---------- AI ART POPUPS ---------- */
+const artDefs={
+ naseer:{ti:"NEURAL PORTRAIT",nm:"Naseer",sub:"Fence · 4th-gen · restored ×11. Geometry off true.",
+   stats:[["GEN","4"],["TRUST","21%"],["OFF-TRUE","×11"]],pal:["#2a1d10","#ffb648","#b9823a","#52d4e0"]},
+ blade:{ti:"ITEM RENDER · 2D",nm:"Coolant-Etched Blade",sub:"Loom-steel. Cyan oxidation along the edge. +6 cut.",
+   stats:[["CUT","+6"],["WEAR","32%"],["VALUE","৳410"]],pal:["#10201d","#6fe39f","#52d4e0","#867a9e"]}
+};
+let z=60;
+function pixel(canvas,pal){ // fake lowpoly pixel render
+ const n=16,c=document.createElement("canvas");c.width=c.height=n;const x=c.getContext("2d");
+ for(let i=0;i<n;i++)for(let j=0;j<n;j++){
+  const d=Math.hypot(i-n/2,j-n/2);
+  let col=pal[0];
+  if(d<3)col=pal[1];else if(d<5)col=pal[2];else if((i+j)%5===0)col=pal[3];
+  if(Math.random()<.12)col=pal[Math.floor(Math.random()*pal.length)];
+  x.fillStyle=col;x.fillRect(i,j,1,1);}
+ canvas.style.background=`url(${c.toDataURL()})`;canvas.style.backgroundSize="cover";canvas.style.imageRendering="pixelated";
+}
+function openArt(key,ax,ay){
+ const d=artDefs[key];if(!d)return;
+ const w=document.createElement("div");w.className="artwin";
+ w.style.left=(ax||40)+"px";w.style.top=(ay||120)+"px";w.style.zIndex=++z;
+ w.innerHTML=`<div class="bar"><span class="ti">${d.ti}</span><button class="x">×</button></div>
+  <div class="canvas gen"></div>
+  <div class="meta"><div class="nm">${d.nm}</div><div class="sub">${d.sub}</div>
+   <div class="stats">${d.stats.map(s=>`<span>${s[0]} <b>${s[1]}</b></span>`).join("")}</div></div>`;
+ document.querySelector(".app").appendChild(w);
+ const cv=w.querySelector(".canvas");
+ setTimeout(()=>{cv.classList.remove("gen");pixel(cv,d.pal);},900);
+ w.querySelector(".x").onclick=()=>w.remove();
+ drag(w,w.querySelector(".bar"));
+}
+function drag(win,handle){
+ let sx,sy,ox,oy,on=false;
+ const dn=e=>{on=true;handle.classList.add("drag");win.style.zIndex=++z;
+  const p=e.touches?e.touches[0]:e;sx=p.clientX;sy=p.clientY;ox=win.offsetLeft;oy=win.offsetTop;
+  document.addEventListener("mousemove",mv);document.addEventListener("touchmove",mv,{passive:false});
+  document.addEventListener("mouseup",up);document.addEventListener("touchend",up);};
+ const mv=e=>{if(!on)return;e.preventDefault();const p=e.touches?e.touches[0]:e;
+  win.style.left=(ox+p.clientX-sx)+"px";win.style.top=(oy+p.clientY-sy)+"px";};
+ const up=()=>{on=false;handle.classList.remove("drag");
+  document.removeEventListener("mousemove",mv);document.removeEventListener("touchmove",mv);};
+ handle.addEventListener("mousedown",dn);handle.addEventListener("touchstart",dn);
+}
+feed.addEventListener("click",e=>{const c=e.target.closest(".art-chip");if(!c)return;
+ const r=c.getBoundingClientRect();openArt(c.dataset.art,Math.min(r.left,window.innerWidth-250),r.bottom+8);});
+
+/* ---------- OPTIONS ---------- */
+const scrim=$("#scrim");
+$("#optsBtn").onclick=()=>scrim.classList.add("open");
+scrim.addEventListener("click",e=>{if(e.target===scrim)scrim.classList.remove("open");});
+function seg(id,attr,fn){$(id).addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;
+ $$(id+" button").forEach(x=>x.classList.remove("on"));b.classList.add("on");fn(b.dataset.v);});}
+seg("#segTheme","theme",v=>root.dataset.theme=v);
+seg("#segAnim","anim",v=>root.dataset.anim=v);
+seg("#segDens","dens",v=>{feed.style.setProperty("--g",v==="dense"?"10px":"18px");
+ $$(".ev").forEach(x=>x.style.marginBottom=v==="dense"?"10px":"18px");});
+
+/* clock */
+setInterval(()=>{$("#clock").textContent=new Date().toTimeString().slice(0,5);},1000);
+$("#clock").textContent=new Date().toTimeString().slice(0,5);
+
+/* live comms trickle */
+const trickle=[["2","rust_imam","","","maghrib in the shrine tier. all welcome. the floor there is still ours."],
+ ["1","Dunya_7","نور المدينة","ar","got the core read. hands already steadier. الحمد لله"],
+ ["3","联防_node","联","","someone in 14 is short on dues. we are counting."]];
+let ti=0;
+setInterval(()=>{if(ti<trickle.length){commsData.global.push(trickle[ti++]);if(ch==="global")renderComms();}},9000);
+</script>
+</body>
+</html>
