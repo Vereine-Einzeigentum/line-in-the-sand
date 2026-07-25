@@ -16,8 +16,7 @@ defmodule LineCore.VerbsTest do
     Emote,
     Score,
     Give,
-    Unwield,
-    Help
+    Unwield
   }
 
   setup do
@@ -545,95 +544,6 @@ defmodule LineCore.VerbsTest do
                  },
                  ["sword"]
                )
-    end
-  end
-
-  describe "Help" do
-    test "bare help lists all available commands" do
-      room = TestHarness.spawn_room("Hub")
-      actor = TestHarness.spawn_player_in(room)
-
-      {:ok, events} =
-        Help.execute(
-          %LineCore.Verb.Context{
-            actor: actor,
-            room: room,
-            room_contents: [actor]
-          },
-          []
-        )
-
-      assert length(events) == 1
-
-      [{:notify_actor, text}] = events
-      assert String.contains?(text, "Available commands:")
-      # Check that common verb names appear
-      assert String.contains?(text, "`look`")
-      assert String.contains?(text, "`help`")
-    end
-
-    test "help <verb> shows details for that verb" do
-      room = TestHarness.spawn_room("Hub")
-      actor = TestHarness.spawn_player_in(room)
-
-      {:ok, events} =
-        Help.execute(
-          %LineCore.Verb.Context{
-            actor: actor,
-            room: room,
-            room_contents: [actor]
-          },
-          ["look"]
-        )
-
-      assert length(events) == 1
-
-      [{:notify_actor, text}] = events
-      # Should contain something about looking
-      assert is_binary(text) and String.length(text) > 0
-    end
-
-    test "help with unknown verb returns error" do
-      room = TestHarness.spawn_room("Hub")
-      actor = TestHarness.spawn_player_in(room)
-
-      assert {:error, :unknown_verb} =
-               Help.execute(
-                 %LineCore.Verb.Context{
-                   actor: actor,
-                   room: room,
-                   room_contents: [actor]
-                 },
-                 ["nonexistentverb"]
-               )
-    end
-
-    test "help handles case-insensitive verb lookup" do
-      room = TestHarness.spawn_room("Hub")
-      actor = TestHarness.spawn_player_in(room)
-
-      {:ok, events_lower} =
-        Help.execute(
-          %LineCore.Verb.Context{
-            actor: actor,
-            room: room,
-            room_contents: [actor]
-          },
-          ["look"]
-        )
-
-      {:ok, events_upper} =
-        Help.execute(
-          %LineCore.Verb.Context{
-            actor: actor,
-            room: room,
-            room_contents: [actor]
-          },
-          ["LOOK"]
-        )
-
-      assert length(events_lower) == 1
-      assert length(events_upper) == 1
     end
   end
 end

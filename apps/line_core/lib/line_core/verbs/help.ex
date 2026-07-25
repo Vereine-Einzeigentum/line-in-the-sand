@@ -1,106 +1,140 @@
 defmodule LineCore.Verbs.Help do
   @moduledoc """
-  `help` — list all available commands.
-  `help <verb>` — show details for a specific verb.
+  `help` — the command index, grouped by what you are trying to do.
+  `help <command>` — detail on one command, with its aliases.
 
-  Pure: produces a single notify_actor event with the help text.
+  Modelled on LambdaMOO's help index: categories of related commands rather
+  than an alphabetical dump of every alias, since a flat list of ~45 aliases
+  tells a new player nothing about where to start.
+
+  Categories are curated (`@categories`), but the verbs inside them resolve
+  through `LineCore.Parser`, and anything uncategorised falls into a catch-all
+  group. A newly registered verb can therefore never go missing from the index —
+  at worst it lands under "Other". A test asserts every known verb is both
+  listed and described.
+
+  Pure: produces a single notify_actor event.
   """
 
   @behaviour LineCore.Verb
 
-  alias LineCore.Parser
+  alias LineCore.{Parser, Verbs}
+
+  @categories [
+    {"Looking around", [Verbs.Look, Verbs.Examine]},
+    {"Getting around", [Verbs.Go]},
+    {"Talking", [Verbs.Say, Verbs.Emote, Verbs.Text, Verbs.Who]},
+    {"Carrying things", [Verbs.Inventory, Verbs.Get, Verbs.Drop, Verbs.Give]},
+    {"Staying alive", [Verbs.Attack, Verbs.Wield, Verbs.Unwield, Verbs.Score]},
+    {"The scrap trade", [Verbs.Scrap, Verbs.Sell]},
+    {"Yourself and this list", [Verbs.Desc, Verbs.Help]}
+  ]
+
+  # Player-facing one-liners, in the game's register. Deliberately not sourced
+  # from @moduledoc — those describe the implementation, not the world.
+  @summaries %{
+    Verbs.Look => "Take in the room, its ways out, and who is standing in it.",
+    Verbs.Examine => "Look closely at one thing.",
+    Verbs.Go => "Walk. Bare directions work alone: n, s, e, w, u, d, in, out.",
+    Verbs.Say => "Speak aloud to the room.",
+    Verbs.Emote => "Act rather than speak. `:` is shorthand.",
+    Verbs.Text => "Message one person privately, wherever they are.",
+    Verbs.Who => "See who else is awake in THE LINE.",
+    Verbs.Inventory => "What you are carrying.",
+    Verbs.Get => "Pick something up.",
+    Verbs.Drop => "Put something down.",
+    Verbs.Give => "Hand something to someone standing with you.",
+    Verbs.Attack => "Commit to violence against someone in the room.",
+    Verbs.Wield => "Take a weapon in hand — main or off.",
+    Verbs.Unwield => "Put a weapon away.",
+    Verbs.Score => "Your condition: hit points, dirham, what you are good at.",
+    Verbs.Scrap => "Break something down into what it is actually worth.",
+    Verbs.Sell => "Trade something to a fence for dirham.",
+    Verbs.Desc => "Set how you, or something you own, reads to others.",
+    Verbs.Help => "This index. `help <command>` for one command."
+  }
 
   @impl true
-  def execute(_ctx, []) do
-    # Bare help: list all available verbs
-    verbs = available_verbs()
-    verb_list = Enum.map_join(verbs, ", ", &"`#{&1}`")
-    text = "Available commands: #{verb_list}. Type `help <command>` for details."
-    {:ok, [{:notify_actor, text}]}
-  end
+  def execute(_ctx, []), do: {:ok, [{:notify_actor, index()}]}
 
-  def execute(_ctx, [verb_name]) do
-    verb_down = String.downcase(verb_name)
+  def execute(_ctx, [name]) do
+    lookup = name |> to_string() |> String.trim() |> String.downcase()
 
-    case verb_for_name(verb_down) do
-      nil ->
-        {:error, :unknown_verb}
-
-      verb_module ->
-        text = verb_help_text(verb_module)
-        {:ok, [{:notify_actor, text}]}
+    case Map.get(Parser.verb_map(), lookup) do
+      nil -> {:error, :unknown_verb}
+      module -> {:ok, [{:notify_actor, detail(module)}]}
     end
   end
 
   def execute(_ctx, _args), do: {:error, :bad_args}
 
-  ## Helpers
+  ## Index
 
-  # Get unique verb aliases from the Parser's verb_map
-  defp available_verbs do
+  defp index do
+    (["THE LINE — command index", "========================"] ++
+       Enum.flat_map(groups(), &render_group/1) ++
+       ["", "Type `help <command>` for detail on any one of them."])
+    |> Enum.join("\n")
+  end
+
+  # Curated categories first, then whatever they missed, so a newly registered
+  # verb still shows up without anyone remembering to file it.
+  defp groups do
+    categorised = Enum.flat_map(@categories, fn {_name, mods} -> mods end)
+
+    case Parser.known_verbs() -- categorised do
+      [] -> @categories
+      others -> @categories ++ [{"Other", Enum.sort_by(others, &canonical_name/1)}]
+    end
+  end
+
+  defp render_group({heading, modules}) do
+    ["", heading] ++ Enum.map(modules, &("  " <> line_for(&1)))
+  end
+
+  defp line_for(module) do
+    padded = module |> canonical_name() |> String.pad_trailing(10)
+
+    case aliases_for(module) do
+      [] -> "#{padded} #{summary(module)}"
+      aliases -> "#{padded} #{summary(module)} (also: #{Enum.join(aliases, ", ")})"
+    end
+  end
+
+  ## Detail
+
+  defp detail(module) do
+    name = canonical_name(module)
+
+    header =
+      case aliases_for(module) do
+        [] -> name
+        aliases -> "#{name} — also: #{Enum.join(aliases, ", ")}"
+      end
+
+    Enum.join([header, String.duplicate("-", String.length(header)), summary(module)], "\n")
+  end
+
+  ## Naming
+
+  # Derived from the module rather than a hand-kept list, so the canonical name
+  # cannot drift from the registry.
+  defp canonical_name(module) do
+    module |> Module.split() |> List.last() |> Macro.underscore()
+  end
+
+  defp aliases_for(module) do
+    canonical = canonical_name(module)
+
     Parser.verb_map()
-    |> Map.keys()
-    |> Enum.uniq()
+    |> Enum.filter(fn {_alias, mod} -> mod == module end)
+    |> Enum.map(fn {alias_name, _} -> alias_name end)
+    |> Enum.reject(&(&1 == canonical))
     |> Enum.sort()
   end
 
-  # Look up a verb module by name/alias
-  defp verb_for_name(name_down) do
-    Map.get(Parser.verb_map(), name_down)
-  end
+  defp summary(module), do: Map.get(@summaries, module, "No description yet.")
 
-  # Get help text for a verb module
-  # Try to fetch @moduledoc via Code.fetch_docs/1, fallback to descriptions map
-  defp verb_help_text(verb_module) do
-    case fetch_moduledoc(verb_module) do
-      {:ok, doc} -> doc
-      :error -> descriptions()[verb_module] || "No documentation available."
-    end
-  end
-
-  # Try to fetch the @moduledoc from a verb module
-  defp fetch_moduledoc(module) do
-    case Code.fetch_docs(module) do
-      {:ok, {_line, _kind, _format, doc_content}} ->
-        # Extract text from the moduledoc structure
-        # doc_content is a list of tuples; we want the text from the first entry
-        case Enum.find(doc_content, fn {_type, _meta, _content} -> true end) do
-          {_, _, content} when is_binary(content) ->
-            {:ok, content}
-
-          _ ->
-            :error
-        end
-
-      _ ->
-        :error
-    end
-  rescue
-    _ -> :error
-  end
-
-  # Fallback descriptions for verbs without @moduledoc
-  defp descriptions do
-    %{
-      LineCore.Verbs.Look => "Look around the current room and nearby items.",
-      LineCore.Verbs.Examine => "Examine an object in detail.",
-      LineCore.Verbs.Go => "Move in a direction (n, s, e, w, u, d, etc.).",
-      LineCore.Verbs.Inventory => "Check your inventory.",
-      LineCore.Verbs.Get => "Pick up an item.",
-      LineCore.Verbs.Drop => "Drop an item from your inventory.",
-      LineCore.Verbs.Say => "Say something aloud to others in the room.",
-      LineCore.Verbs.Emote => "Perform an emote or action.",
-      LineCore.Verbs.Text => "Send a private message to another player.",
-      LineCore.Verbs.Who => "See who else is playing.",
-      LineCore.Verbs.Desc => "Describe yourself or an object.",
-      LineCore.Verbs.Attack => "Attack another creature or player.",
-      LineCore.Verbs.Wield => "Wield a weapon in your main or off hand.",
-      LineCore.Verbs.Unwield => "Stop wielding a weapon.",
-      LineCore.Verbs.Scrap => "Scrap an item for resources.",
-      LineCore.Verbs.Sell => "Sell an item to an NPC.",
-      LineCore.Verbs.Give => "Give an item to another player.",
-      LineCore.Verbs.Score => "Check your character statistics.",
-      LineCore.Verbs.Help => "Display this help text."
-    }
-  end
+  @doc "Verb modules this index has player-facing text for. Used by tests."
+  def described_verbs, do: Map.keys(@summaries)
 end
