@@ -133,7 +133,8 @@ defmodule LineCore.Seed.DistrictOne do
 
     Genesis.item!(sz_w, "scrap pistol frame",
       template: :weapon,
-      description: "The bare frame of a cheap automatic. No magazine, no slide, no trigger group. Salvageable.",
+      description:
+        "The bare frame of a cheap automatic. No magazine, no slide, no trigger group. Salvageable.",
       properties: %{scrap_value: 30, tag: "weapon"}
     )
 

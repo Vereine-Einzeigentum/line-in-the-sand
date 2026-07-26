@@ -321,8 +321,9 @@ defmodule LineCore.Genesis do
 
   defp validate_name(""), do: {:error, :name_empty}
 
-  defp validate_name(name) when is_binary(name) and byte_size(name) >= 1 and byte_size(name) <= 120,
-    do: {:ok, name}
+  defp validate_name(name)
+       when is_binary(name) and byte_size(name) >= 1 and byte_size(name) <= 120,
+       do: {:ok, name}
 
   defp validate_name(name) when is_binary(name), do: {:error, :name_too_long}
   defp validate_name(_), do: {:error, :name_invalid}

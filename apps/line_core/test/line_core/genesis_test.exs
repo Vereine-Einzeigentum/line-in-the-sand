@@ -63,8 +63,8 @@ defmodule LineCore.GenesisTest do
       prop_events = Enum.filter(events, &match?({:set_property, _, _, _}, &1))
       assert length(prop_events) == 2
 
-      assert {:set_property, ^id, "scrap_value", 12} in prop_events
-      assert {:set_property, ^id, "tag", "scrap"} in prop_events
+      assert {:set_property, id, "scrap_value", 12} in prop_events
+      assert {:set_property, id, "tag", "scrap"} in prop_events
     end
 
     test "emits a :relate event when place_in is provided" do
@@ -73,14 +73,14 @@ defmodule LineCore.GenesisTest do
       {:ok, %{id: id, events: events}} =
         Genesis.plan(%{name: "thing", type: :item, place_in: room.id})
 
-      assert {:relate, room.id, ^id, :contains} in events
+      assert {:relate, room.id, id, :contains} in events
     end
 
     test "property keys are stringified" do
       {:ok, %{id: id, events: events}} =
         Genesis.plan(%{name: "x", type: :item, properties: %{damage: 5}})
 
-      assert {:set_property, ^id, "damage", 5} in events
+      assert {:set_property, id, "damage", 5} in events
     end
 
     test "returns error when name is missing" do
@@ -123,7 +123,8 @@ defmodule LineCore.GenesisTest do
 
       {:ok, obj} = Genesis.create(%{name: "crate", type: :item, place_in: room.id})
 
-      assert %{id: ^room.id} = Object.container_of(obj.id)
+      assert %{id: container_id} = Object.container_of(obj.id)
+      assert container_id == room.id
     end
 
     test "all-or-nothing: invalid place_in rolls back the object too" do
