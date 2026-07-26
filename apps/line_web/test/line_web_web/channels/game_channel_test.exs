@@ -19,7 +19,7 @@ defmodule LineWebWeb.GameChannelTest do
 
   defp connect_player(player) do
     {:ok, socket} =
-      connect(UserSocket, %{"token" => LineWebWeb.PlayerToken.sign(player.id)})
+      connect(UserSocket, %{"player_id" => player.id})
 
     {:ok, _, socket} = subscribe_and_join(socket, GameChannel, "game:#{player.id}")
     socket
@@ -84,7 +84,7 @@ defmodule LineWebWeb.GameChannelTest do
     {:ok, p1} = Object.create(:player, "Player1")
     {:ok, p2} = Object.create(:player, "Player2")
 
-    {:ok, socket} = connect(UserSocket, %{"token" => LineWebWeb.PlayerToken.sign(p1.id)})
+    {:ok, socket} = connect(UserSocket, %{"player_id" => p1.id})
 
     assert {:error, %{reason: "player_id mismatch"}} =
              subscribe_and_join(socket, GameChannel, "game:#{p2.id}")
@@ -103,7 +103,7 @@ defmodule LineWebWeb.GameChannelTest do
     room = TestHarness.spawn_room("Stage")
     alice = TestHarness.spawn_player_in(room, "Alice")
     bob = TestHarness.spawn_player_in(room, "Bob")
-    _socket_bob = connect_player(bob)
+    socket_bob = connect_player(bob)
 
     # Alice says something via direct dispatcher call
     LineCore.Dispatcher.dispatch(alice.id, LineCore.Verbs.Say, ["hello"], "say hello")

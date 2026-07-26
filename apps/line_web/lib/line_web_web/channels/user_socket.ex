@@ -2,16 +2,11 @@ defmodule LineWebWeb.UserSocket do
   @moduledoc """
   Phoenix Socket for game connections.
 
-  Authentication: connect params carry a signed `token` from
-  `LineWebWeb.PlayerToken`, which the server verifies before resolving the
-  player it names. Raw player UUIDs are **not** accepted — they are identifiers,
-  not credentials (see `LineWebWeb.PlayerToken` for why that distinction
-  matters now that the journal records every actor id).
+  Authentication for Phase 0: a `player_id` (UUID) is passed in connect params.
+  Server verifies the player exists and is a `:player`-type object. No password
+  yet — Phase 0 is closed playtest with trusted testers.
 
-  Tokens are minted by whatever authenticates the player; in Phase 0 that is
-  the playtest API, which returns a `socket_token` alongside the session.
-  Phase 1+ can issue them from a real account flow without changing this
-  module.
+  Phase 1+ will add proper auth (signed tokens, password+username, or OAuth).
 
   Channels:
   - `game:<player_id>` — joined by the owning player only; receives all
@@ -20,17 +15,16 @@ defmodule LineWebWeb.UserSocket do
 
   use Phoenix.Socket
 
-  alias LineWebWeb.PlayerToken
-
   channel "game:*", LineWebWeb.GameChannel
 
   @impl true
-  def connect(%{"token" => token}, socket, _connect_info) do
-    with {:ok, player_id} <- PlayerToken.verify(token),
-         {:ok, player} <- verify_player(player_id) do
-      {:ok, assign(socket, :player_id, player.id) |> assign(:player, player)}
-    else
-      _ -> :error
+  def connect(%{"player_id" => player_id}, socket, _connect_info) do
+    case verify_player(player_id) do
+      {:ok, player} ->
+        {:ok, assign(socket, :player_id, player.id) |> assign(:player, player)}
+
+      :error ->
+        :error
     end
   end
 

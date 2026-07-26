@@ -120,7 +120,6 @@ defmodule LineCore.CombatTest do
     test "errors when attacking self" do
       room = TestHarness.spawn_room("Hub")
       player = TestHarness.spawn_player_in(room, "Solo")
-
       # find_target/2 excludes the actor from candidates, so self-name resolves to nil → :not_found
       assert {:error, :not_found} = TestHarness.dispatch(player, Attack, ["Solo"])
     end

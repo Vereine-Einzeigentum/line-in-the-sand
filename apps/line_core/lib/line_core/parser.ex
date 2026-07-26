@@ -10,15 +10,6 @@ defmodule LineCore.Parser do
 
   @directions ~w(n north s south e east w west u up d down ne northeast nw northwest se southeast sw southwest in out)
 
-  # Punctuation prefixes that stand in for a verb: `"hello` is `say hello`,
-  # `:waves` is `emote waves`. Ordered, and checked before the verb table,
-  # since these need no separating space. Exposed via `shorthands/0` so the
-  # help index can list them as the aliases they are.
-  @shorthands [
-    {"\"", Verbs.Say},
-    {":", Verbs.Emote}
-  ]
-
   @verb_map %{
     "look" => Verbs.Look,
     "l" => Verbs.Look,
@@ -40,8 +31,6 @@ defmodule LineCore.Parser do
     "put" => Verbs.Drop,
     "discard" => Verbs.Drop,
     "say" => Verbs.Say,
-    "emote" => Verbs.Emote,
-    "me" => Verbs.Emote,
     "text" => Verbs.Text,
     "txt" => Verbs.Text,
     "tell" => Verbs.Text,
@@ -59,26 +48,12 @@ defmodule LineCore.Parser do
     "wield" => Verbs.Wield,
     "hold" => Verbs.Wield,
     "equip" => Verbs.Wield,
-    "score" => Verbs.Score,
-    "stats" => Verbs.Score,
-    "sc" => Verbs.Score,
-    "unwield" => Verbs.Unwield,
-    "unequip" => Verbs.Unwield,
-    "sheathe" => Verbs.Unwield,
-    "give" => Verbs.Give,
-    "hand" => Verbs.Give,
 
     # Scrap loop
     "scrap" => Verbs.Scrap,
     "salvage" => Verbs.Scrap,
     "sell" => Verbs.Sell,
-    "fence" => Verbs.Sell,
-
-    # Help
-    "help" => Verbs.Help,
-    "h" => Verbs.Help,
-    "commands" => Verbs.Help,
-    "?" => Verbs.Help
+    "fence" => Verbs.Sell
   }
 
   def parse(input) when is_binary(input) do
@@ -88,8 +63,9 @@ defmodule LineCore.Parser do
       trimmed == "" ->
         {:empty, ""}
 
-      shorthand = match_shorthand(trimmed) ->
-        shorthand
+      String.starts_with?(trimmed, "\"") ->
+        message = String.trim_leading(trimmed, "\"") |> String.trim()
+        {:ok, Verbs.Say, [message]}
 
       String.downcase(trimmed) in @directions ->
         {:ok, Verbs.Go, [String.downcase(trimmed)]}
@@ -97,14 +73,6 @@ defmodule LineCore.Parser do
       true ->
         parse_verb(trimmed)
     end
-  end
-
-  defp match_shorthand(trimmed) do
-    Enum.find_value(@shorthands, fn {prefix, module} ->
-      if String.starts_with?(trimmed, prefix) do
-        {:ok, module, [trimmed |> String.trim_leading(prefix) |> String.trim()]}
-      end
-    end)
   end
 
   defp parse_verb(input) do
@@ -151,7 +119,6 @@ defmodule LineCore.Parser do
 
   defp parse_args(Verbs.Go, rest), do: [String.downcase(rest)]
   defp parse_args(Verbs.Inventory, _rest), do: []
-  defp parse_args(Verbs.Score, _rest), do: []
 
   defp parse_args(Verbs.Wield, rest) do
     case Regex.run(~r/^(.+?)\s+(main|off)$/i, rest) do
@@ -168,37 +135,7 @@ defmodule LineCore.Parser do
     end
   end
 
-  # Give uses "X to Y" syntax: same as Sell
-  defp parse_args(Verbs.Give, rest) do
-    case Regex.run(~r/^(.+?)\s+to\s+(.+)$/i, rest) do
-      [_, item, target] -> [String.trim(item), String.trim(target)]
-      _ -> [rest]
-    end
-  end
-
-  defp parse_args(Verbs.Unwield, rest) do
-    case rest do
-      "" -> []
-      item -> [item]
-    end
-  end
-
-  defp parse_args(Verbs.Help, rest) do
-    case rest do
-      "" -> []
-      verb -> [verb]
-    end
-  end
-
   defp parse_args(_module, rest), do: [rest]
-
-  @doc """
-  Punctuation prefixes that stand in for a verb, as `{prefix, module}` pairs.
-
-  These never appear in `verb_map/0` because they are matched as prefixes
-  rather than whitespace-delimited words.
-  """
-  def shorthands, do: @shorthands
 
   def verb_map, do: @verb_map
   def known_verbs, do: @verb_map |> Map.values() |> Enum.uniq()

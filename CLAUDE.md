@@ -5,9 +5,14 @@ Guidance for AI assistants (and humans) working in this repository.
 ## What this is
 
 **LINE IN THE SAND** is a multiplayer text **MOO** (MUD, Object-Oriented) set in
-THE LINE / NEOM. Players connect via webclient/mobile app and issue text commands (`look`,
-`north`, `kill jackass`, `scrap`, `sell knife to guy`) that mutate a shared,
-persistent world graph. It is an Elixir project, and rn Phoenix and Bandit support this.
+THE LINE / NEOM. Players connect over the web and issue text commands (`look`,
+`go north`, `attack fence`, `scrap`, `sell knife to fence`) that mutate a shared,
+persistent world graph. It is an Elixir/Phoenix umbrella project backed by
+PostgreSQL.
+
+The project is early — it is at **Phase 0** (closed playtest spine). The core
+object graph, verb dispatch, persistence, combat, presence, an HTTP playtest API,
+and a websocket channel are working. `line_world` and `line_ml` are still stubs.
 
 ## Stack
 
@@ -18,7 +23,7 @@ persistent world graph. It is an Elixir project, and rn Phoenix and Bandit suppo
 - **Phoenix.PubSub** for in-process broadcast; **Phoenix Channels** for websockets
 - No Tailwind / CSS framework, no esbuild — static CSS is served from
   `apps/line_web/priv/static/assets/`. Do not add a frontend build pipeline
-  without checking with a human.
+  without checking first; it was deliberately omitted. The Frontend is the Client. The Repo is the server.
 
 ## Umbrella layout
 
@@ -47,22 +52,23 @@ verbs are pure functions that emit events the dispatcher applies.**
 
 Three Ecto schemas in `apps/line_core/lib/line_core/schemas/`:
 
-- **`Object`** (`objects` table) — every player, room, item, NPC, exit... everything, even skills, attributes, factions, and damage varieties. A property is either an inert string, a verb, or a reference to an object, sometimes with a numeric value attached. That includes all of the following:
-
--  `description`, `verbs` (string list), `parent_id` (prototype), and UUID (`hex_id`) throughout.
-- **`Property`** (`object_properties` table) — EAV key/value attached to an object.
-- **`Relationship`** (`object_relationships` table) — edges.
--  `:contains`, `:exit_to`, `:owns`, `:wields_main`, `:wields_off`, `:wears`,
- - `:follows`, `:targeting`. Per-edge `metadata`  (e.g. exit `direction`).
+- **`Object`** (`objects` table) — every player, room, item, NPC, exit. Has
+  `type` (`:player | :room | :item | :npc | :exit`), `name`, `description`,
+  `verbs` (string list), and `deleted_at` (soft delete). UUID (`binary_id`)
+  primary keys throughout.
+- **`Property`** (`object_properties` table) — EAV key/value attached to an
+  object. `value` is **JSONB**. Scalars are wrapped as `%{"v" => value}` on the
+  way in and unwrapped on the way out (see `LineCore.Object.get_property/2`).
+  Examples: `hp_current`, `hp_max`, `dirham`, `stat_wire`, `skill_scrap`,
+  `custom_description`, `location_phrase`, `active_state`.
+- **`Relationship`** (`object_relationships` table) — directed edges. Types:
+  `:contains`, `:exit_to`, `:owns`, `:wields_main`, `:wields_off`, `:wears`,
+  `:follows`, `:targeting`. Per-edge `metadata` JSONB (e.g. exit `direction`).
 
 **Always go through `LineCore.Object`** for graph access — it handles property
 casting, containment (`contents/1`, `container_of/1`), exits (`exits/1`,
 `resolve_exit/2`, `canonicalize_direction/1`), and relationship traversal.
-Don't hand-write Ecto queries against the schemas from verbs. (`verbs/wield.ex`
-and `verbs/unwield.ex` currently do; that's debt, not a pattern to copy.)
-
-### Prototype inheritance (generics)
-
+Don't hand-write Ecto queries against the schemas from verbs.
 
 ### Verbs are pure; the dispatcher is the only side-effecting place
 
@@ -131,14 +137,8 @@ Two ways into the game, both routing raw input through `LineCore.Parser` and the
 `LineCore.Dispatcher`:
 
 - **Websocket** — `LineWebWeb.UserSocket` (`game:*` channel →
-  `LineWebWeb.GameChannel`). Auth takes a **signed `token`** in connect params
-  (`LineWebWeb.PlayerToken`, backed by `Phoenix.Token` and the endpoint's
-  `secret_key_base`, 24h lifetime); the socket verifies the signature, then that
-  the id it names is a live `:player` object. **Raw player UUIDs are not
-  accepted** — ids are identifiers, not credentials, which matters because the
-  journal records `actor_id` on every dispatch and the world model reads it.
-  The playtest API returns a `socket_token` alongside the session. There are
-  still no passwords; token minting is whatever authenticates the player.
+  `LineWebWeb.GameChannel`). Phase 0 auth is just a `player_id` UUID in connect
+  params; the socket verifies it's a `:player`-type object. No passwords yet.
   The channel subscribes the connection to the actor + room topics, registers
   presence, forwards PubSub messages to the client, and re-subscribes on room
   changes after `go`.
@@ -212,12 +212,8 @@ Dev DB defaults (`config/dev.exs`): `postgres`/`postgres` @ `localhost`, databas
 - **Keep verbs pure.** This is the load-bearing convention. Side effects belong
   in the object as controlled by the dispatcher via events.
 - **Zero-warning builds.** The project standard is
-  `mix compile --warnings-as-errors` clean, and `mix test` warning-free too —
-  test files included (no unused aliases or variables). Project code currently
-  meets this. The remaining warnings all come from upstream deps when they are
-  recompiled from scratch: `ecto_sql` on OTP 26 (`Process.set_label/1`) and two
-  in `phoenix`'s `code_reloader/server.ex`. Those are not ours to fix; anything
-  originating in `apps/` is.
+  `mix compile --warnings-as-errors` clean. The only known warning is from
+  upstream `ecto_sql` on OTP 26 (`Process.set_label/1`), not project code. This is not intentional, do better.
 - **`mix format`** is configured at the root (`.formatter.exs`, with
   `subdirectories: ["apps/*"]`). Run it before committing.
 - Lower apps (`line_world`, `line_ml`, `line_shared`) are intentionally

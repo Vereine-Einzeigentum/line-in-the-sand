@@ -9,7 +9,6 @@ defmodule LineWebWeb.PlaytestControllerRawTest do
     Ecto.Adapters.SQL.Sandbox.checkout(Repo)
     Ecto.Adapters.SQL.Sandbox.mode(Repo, :auto)
     System.put_env("PLAYTEST_TOKEN", @playtest_token)
-    LineCore.Seed.Generics.seed()
 
     on_exit(fn ->
       System.delete_env("PLAYTEST_TOKEN")
@@ -22,8 +21,7 @@ defmodule LineWebWeb.PlaytestControllerRawTest do
     :ok
   end
 
-  defp auth(conn),
-    do: Plug.Conn.put_req_header(conn, "authorization", "Bearer " <> @playtest_token)
+  defp auth(conn), do: Plug.Conn.put_req_header(conn, "authorization", "Bearer " <> @playtest_token)
 
   test "POST /cmd with raw form dispatches via parser", %{conn: conn} do
     room = TestHarness.spawn_room("Hub", "A small room.")

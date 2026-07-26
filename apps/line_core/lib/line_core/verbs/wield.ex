@@ -58,7 +58,8 @@ defmodule LineCore.Verbs.Wield do
           {:unrelate, ctx.actor.id, item.id, :contains},
           {:relate, ctx.actor.id, item.id, hand_relation},
           {:notify_actor, "You wield the #{item.name} in your #{hand_label} hand."},
-          {:notify_room, "#{ctx.actor.name} wields a #{item.name}.", except: [ctx.actor.id]}
+          {:notify_room, "#{ctx.actor.name} wields a #{item.name}.",
+           except: [ctx.actor.id]}
         ]
 
         {:ok, swap_events ++ equip_events}

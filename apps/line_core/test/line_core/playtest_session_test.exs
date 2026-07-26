@@ -6,9 +6,6 @@ defmodule LineCore.PlaytestSessionTest do
   setup do
     pid = Ecto.Adapters.SQL.Sandbox.start_owner!(Repo, shared: true)
 
-    # Generics must be seeded so Genesis.player! can derive from the PC generic.
-    LineCore.Seed.Generics.seed()
-
     on_exit(fn ->
       Ecto.Adapters.SQL.Sandbox.stop_owner(pid)
     end)
@@ -16,7 +13,7 @@ defmodule LineCore.PlaytestSessionTest do
     :ok
   end
 
-  test "create spawns a player in the starting room" do
+  test "create spawns an ephemeral player in the starting room" do
     room = TestHarness.spawn_room("Hub", "A room.")
     {:ok, token} = PlaytestSession.create(room.id)
 
@@ -73,7 +70,7 @@ defmodule LineCore.PlaytestSessionTest do
     assert length(batch2) >= 3
   end
 
-  test "terminate tears down the session but the player body persists" do
+  test "terminate cleans up the ephemeral player" do
     room = TestHarness.spawn_room("Hub")
     {:ok, token} = PlaytestSession.create(room.id)
 
@@ -86,23 +83,8 @@ defmodule LineCore.PlaytestSessionTest do
     # Session is gone
     refute PlaytestSession.exists?(token)
 
-    # Player body persists in the world — only the connection is gone
-    assert %{type: :player} = Object.get(player_id)
-    assert Object.get_property(player_id, "active_state") == "offline"
-  end
-
-  test "a player object survives session idle-expiry" do
-    room = TestHarness.spawn_room("Hub")
-    {:ok, token} = PlaytestSession.create(room.id)
-    {:ok, info} = PlaytestSession.info(token)
-    player_id = info.player_id
-
-    # Use terminate/1 (which calls the same cleanup as idle expiry) so we don't
-    # have to wait 15 minutes for the real timeout to fire.
-    PlaytestSession.terminate(token)
-    Process.sleep(50)
-
-    assert %{type: :player} = Object.get(player_id)
+    # Ephemeral player is soft-deleted
+    assert Object.get(player_id) == nil
   end
 
   test "operations on a non-existent token return errors gracefully" do
