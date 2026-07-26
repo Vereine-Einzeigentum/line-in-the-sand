@@ -1,7 +1,7 @@
 defmodule LineCore.PlaytestSessionTest do
   use ExUnit.Case, async: false
 
-  alias LineCore.{Object, PlaytestSession, Repo, TestHarness}
+  alias LineCore.{Catchup, Object, PlaytestSession, Repo, TestHarness}
 
   setup do
     pid = Ecto.Adapters.SQL.Sandbox.start_owner!(Repo, shared: true)
@@ -70,7 +70,7 @@ defmodule LineCore.PlaytestSessionTest do
     assert length(batch2) >= 3
   end
 
-  test "terminate cleans up the ephemeral player" do
+  test "terminate ends the session but the player survives it" do
     room = TestHarness.spawn_room("Hub")
     {:ok, token} = PlaytestSession.create(room.id)
 
@@ -80,11 +80,37 @@ defmodule LineCore.PlaytestSessionTest do
     assert :ok = PlaytestSession.terminate(token)
     Process.sleep(50)
 
-    # Session is gone
+    # The session is gone...
     refute PlaytestSession.exists?(token)
 
-    # Ephemeral player is soft-deleted
-    assert Object.get(player_id) == nil
+    # ...but a connection ending is not a reason to destroy a character.
+    assert %{id: ^player_id} = Object.get(player_id)
+  end
+
+  test "a player left by a session stays in the room, marked unattended" do
+    room = TestHarness.spawn_room("Hub")
+    {:ok, token} = PlaytestSession.create(room.id)
+    {:ok, %{player_id: player_id}} = PlaytestSession.info(token)
+
+    PlaytestSession.terminate(token)
+    Process.sleep(50)
+
+    assert %{id: room_id} = Object.container_of(player_id)
+    assert room_id == room.id
+    assert Object.get_property(player_id, "active_state") == Catchup.offline_state()
+    assert Object.contents(room.id) |> Enum.any?(&(&1.id == player_id))
+  end
+
+  test "a session marks its player online, clearing any prior offline state" do
+    room = TestHarness.spawn_room("Hub")
+    {:ok, token} = PlaytestSession.create(room.id)
+    {:ok, %{player_id: player_id}} = PlaytestSession.info(token)
+
+    assert Object.get_property(player_id, "active_state") == nil
+
+    PlaytestSession.terminate(token)
+    Process.sleep(50)
+    assert Object.get_property(player_id, "active_state") == Catchup.offline_state()
   end
 
   test "operations on a non-existent token return errors gracefully" do

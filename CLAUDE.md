@@ -59,8 +59,9 @@ Three Ecto schemas in `apps/line_core/lib/line_core/schemas/`:
 - **`Property`** (`object_properties` table) — EAV key/value attached to an
   object. `value` is **JSONB**. Scalars are wrapped as `%{"v" => value}` on the
   way in and unwrapped on the way out (see `LineCore.Object.get_property/2`).
-  Examples: `hp_current`, `hp_max`, `dirham`, `stat_wire`, `skill_scrap`,
-  `custom_description`, `location_phrase`, `active_state`.
+  Examples: `hp_current`, `hp_max`, `dirham`, `stat_wire`, `skill_scrap_xp`,
+  `custom_description`, `location_phrase`, `active_state`, `instance_type`,
+  `source`, `last_seen_at`.
 - **`Relationship`** (`object_relationships` table) — directed edges. Types:
   `:contains`, `:exit_to`, `:owns`, `:wields_main`, `:wields_off`, `:wears`,
   `:follows`, `:targeting`. Per-edge `metadata` JSONB (e.g. exit `direction`).
@@ -75,8 +76,38 @@ and `verbs/unwield.ex` currently do; that's debt, not a pattern to copy.)
 
 MOO-style, and the reason `parent_id` exists. Objects derive from **generics** —
 `:generic`-typed prototypes seeded by `LineCore.Seed.Generics`, rooted at a
-mother object (`The Line`) with `Generic Room`, `Generic Thing`, `Generic Being`
-→ `Generic Player` / `Generic NPC`, and `Generic Weapon` / `Generic Scrap`.
+mother object (`The Line`):
+
+```
+The Line
+├── Generic Room
+├── Generic Thing
+│   ├── Generic Weapon
+│   └── Generic Scrap
+└── Generic Mob
+    ├── Generic Human
+    │   ├── Generic NPC
+    │   └── Generic PC
+    └── Generic Agent
+        └── Generic Operator
+            ├── Generic Supervisor ── Generic Representative
+            └── Generic Handler ──── Generic Director ──── Generic Shareholder
+```
+
+NPC and PC split at `Human` so the only real difference — whether anyone is
+driving it — sits at the leaf, which is what makes a logged-out PC structurally
+identical to an NPC. Staff branch at `Mob`: they are of the building, not of the
+residents, and the corporate ladder doubles as the permission ladder since
+`effective_verbs/1` unions *up* the chain.
+
+`Generic Thing`, `Generic Mob`, `Generic Human` and `Generic Agent` are
+**abstract** — they deliberately carry no `instance_type`, so deriving a type
+from one is a hard `:abstract_generic` error rather than a silent wrong answer.
+
+Property defaults on the generics follow `mechanics.md` (the canon for health
+bars, core stats and chargen attributes). `Generic Mob` carries the three bars
+and eight `stat_*` attributes; `Generic PC` carries the four core stats. Skill
+*totals* are not stored — canon derives them from two attributes each.
 
 - **Properties resolve up the chain**, nearest wins. An object stores only what
   differs from its generic; `Object.get_property/2` falls back through
@@ -85,14 +116,45 @@ mother object (`The Line`) with `Generic Room`, `Generic Thing`, `Generic Being`
   non-inherited values.
 - **Verbs union up the chain** (`effective_verbs/1`) — a generic grants
   capabilities, a descendant adds its own.
-- **`spawn_from/3`** is the idiomatic constructor: derive from a generic and
-  inherit its type. This is what the object model should use to mint NPCs and
-  items rather than setting every property from scratch.
+- **`LineCore.Genesis` is the only supported way to create an object.** Never
+  hand-assemble one out of `Object.create/3` plus trailing `relate` and
+  `set_property` calls — that was the old pattern, it set no `parent_id`, and it
+  was not atomic. `Object.spawn_from/3` is superseded for the same reason: it
+  defaults type to the generic's own, and a generic is always `:generic`.
 - **Cycles are refused** by `set_parent/2`, and chain walking is capped and
   cycle-tolerant so bad data degrades instead of hanging.
 - Ancestor walking deliberately **ignores `deleted_at`** — soft-deleting a
   generic must not silently strip defaults from everything beneath it. Don't
   delete the mother object.
+
+### Creating objects: `LineCore.Genesis`
+
+`Genesis.plan/1` pre-generates the object's UUID and returns the ordered event
+list that materialises it — `{:create_object, attrs}` then `:relate` then
+`:set_property`, all naming the same id. Because the id exists before anything
+is written, a whole object is describable as one event list with no forward
+references, so a verb can splice a plan straight into its own `{:ok, events}`.
+`plan/1` performs reads but never writes.
+
+`Genesis.create/1` (and `create!/1`, `create_many/1`) applies a plan in one
+transaction, for callers outside the dispatcher pipeline. The readable helpers
+are `room!/2`, `item!/3`, `npc!/3`, `player!/2`.
+
+```elixir
+Genesis.item!(room, "bent crowbar",
+  template: :weapon,
+  description: "Steel crowbar, bent at the hook.",
+  properties: %{scrap_value: 15, damage: 18}
+)
+```
+
+Type is decided at the call site, never inherited from a `:generic` parent: a
+helper fixes it, an explicit `:type` wins, otherwise it resolves from the
+template's `instance_type`. `plan/1` **refuses `type: :player`** — creating a
+player is an account-lifecycle concern, not a world mutation, and `player!/2` is
+the deliberate door. Every created object records a `source` property
+(`:seed | :hand | :generated | :playtest | :player`) for attribution — not as a
+licence to delete.
 
 ### Verbs are pure; the dispatcher is the only side-effecting place
 
@@ -114,7 +176,8 @@ writes, no broadcasts, no `Repo` calls that mutate. They read from the
 **Event types** (full list in `dispatcher.ex` and the `LineCore.Verb` typespec):
 
 - Persistent (in the Multi): `:set_property`, `:delete_property`, `:move`,
-  `:relate`, `:unrelate`, `:create_object`, `:delete_object`.
+  `:relate`, `:unrelate`, `:create_object`, `:delete_object` (**refuses
+  `:player`-typed objects** — see Player persistence below).
 - Notification (PubSub only): `:notify_actor`, `:notify_room` (supports
   `except: [ids]`), `:notify_object`, `:broadcast_channel`.
 
@@ -151,9 +214,30 @@ display is rendered by `LineCore.Renderer` (a five-section format with word-wrap
   keyed on `player_id`. Source of truth for the `who` verb; entries vanish when
   the session process dies.
 - **`LineCore.PlaytestSession`** — a `GenServer` (one per session, registered in
-  `LineCore.PlaytestRegistry`) that owns an ephemeral player object, subscribes
-  to its topics, and buffers messages in a bounded queue for HTTP long-poll
-  delivery. Idle-expires after 15 minutes and soft-deletes the player. [this is not implementation spec, just testing]
+  `LineCore.PlaytestRegistry`) that owns a player object, subscribes to its
+  topics, and buffers messages in a bounded queue for HTTP long-poll delivery.
+  Idle-expires after 15 minutes (overridable via the `:playtest_idle_timeout`
+  app env) and marks the player offline — it does **not** delete them.
+  [this is not implementation spec, just testing]
+
+### Player persistence
+
+**Players are never deleted.** A session ending — by `terminate/1`, idle expiry,
+or websocket disconnect — releases connection-scoped resources only. The body
+stays in the room it was standing in, marked offline via an `active_state`
+property, visible in `look` and still a legal target. The refusal is enforced in
+`Dispatcher.apply_event_to_multi/3`, so no verb can route around it, and
+`Genesis` exposes no delete function at all.
+
+**`LineCore.Catchup`** owns the transition. `mark_offline/2` sets `active_state`
+and stamps `last_seen_at`; `mark_online/1` clears the marker; `digest/1` replays
+what happened while nobody was driving. That replay is a **journal read** — a
+death notice is published to an actor topic with no subscriber and would
+otherwise evaporate, but the journal recorded the event list, so the
+`notify_object` events naming the player are recoverable. `GameChannel` pushes
+the digest on join.
+
+`who` remains a connection roster and lists online players only.
 
 ### The web layer (`line_web`)
 
@@ -220,9 +304,16 @@ Dev DB defaults (`config/dev.exs`): `postgres`/`postgres` @ `localhost`, databas
 - Tests live in each app's `test/` directory; `line_core` has the meat
   (`test/line_core/*_test.exs`).
 - **`LineCore.TestHarness`** is the ergonomic way to test the MOO: it spawns
-  ephemeral rooms/players/items, subscribes the **calling test process** to actor
-  topics, dispatches verbs synchronously (bypassing HTTP/websockets), and offers
-  `assert_msg/1` (string or regex). Prefer it over wiring PubSub by hand.
+  rooms/players/items, subscribes the **calling test process** to actor topics,
+  dispatches verbs synchronously (bypassing HTTP/websockets), and offers
+  `assert_msg/1` (string or regex). Prefer it over wiring PubSub by hand. Its
+  spawners go through `Genesis` and take **keyword opts** (`description:`,
+  `properties:`, `template:`), so harness-built objects inherit exactly like
+  seeded content and the verb/combat suites exercise inheritance transitively.
+  They call `ensure_generics/0` first, since the sandbox rolls back per test.
+- Tests that start a `GenServer` (playtest sessions) need a **shared** sandbox
+  owner — `Sandbox.start_owner!(Repo, shared: true)` — or the process cannot see
+  the test's connection.
 - DB tests use the **Ecto SQL Sandbox** in `:manual` mode
   (`apps/line_core/test/test_helper.exs`). Check out the sandbox per test.
 - `line_web` test support: `test/support/conn_case.ex`, `channel_case.ex`
@@ -258,8 +349,12 @@ Dev DB defaults (`config/dev.exs`): `postgres`/`postgres` @ `localhost`, databas
 
 Phase 0 content is seeded by `LineCore.Seed.DistrictOne` (run via
 `mix line_core.seed`): a Safehouse, a four-room Scrap Zone, a Fence Shop, and a
-fence NPC with starter items. The seed is **idempotent** (keyed on the safehouse
-name). New canonical content goes in `apps/line_core/lib/line_core/seed/`.
+fence NPC with starter items. It calls `Seed.Generics.seed/0` first — the
+prototype chain has to exist before anything can descend from it — and builds
+everything through `Genesis`, so seeded content genuinely inherits (the crowbar
+gets `wield`/`unwield` from `Generic Weapon` without listing them). The seed is
+**idempotent** (keyed on the safehouse name). New canonical content goes in
+`apps/line_core/lib/line_core/seed/`.
 
 ## Git / workflow
 

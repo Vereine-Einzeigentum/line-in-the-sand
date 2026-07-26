@@ -98,6 +98,22 @@ defmodule LineCore.Dispatcher do
     |> Repo.transaction()
   end
 
+  @doc """
+  Fold persistent events into `multi`, ignoring notification events.
+
+  Public so callers outside the verb pipeline — `LineCore.Genesis.create/1`
+  most of all — materialise event lists through *these* appliers rather than
+  reimplementing them. Keeping one implementation is the point: the rules for
+  what `{:move, ...}` or `{:set_property, ...}` mean to the database live here
+  and nowhere else.
+
+  No `Context` is involved because no persistent event consults one; only
+  broadcasting does, and that is not this function's job.
+  """
+  def apply_to_multi(multi, events) do
+    Enum.reduce(events, multi, fn event, acc -> apply_event_to_multi(acc, event, nil) end)
+  end
+
   defp apply_event_to_multi(multi, {:set_property, object_id, key, value}, _ctx) do
     stored = if is_map(value), do: value, else: %{"v" => value}
 
@@ -165,13 +181,23 @@ defmodule LineCore.Dispatcher do
     Multi.insert(multi, {:create_object, make_ref()}, Object.changeset(%Object{}, attrs))
   end
 
+  # Players are never deleted. A body persists whether or not anyone is driving
+  # it, so there is no world event that should be able to remove one — combat
+  # already respawns rather than deletes, and a session ending is not a reason
+  # to destroy a character. The refusal lives here, in the one place events
+  # become writes, so no verb can route around it.
   defp apply_event_to_multi(multi, {:delete_object, object_id}, _ctx) do
     import Ecto.Query
 
-    Multi.update_all(
-      multi,
+    Multi.run(multi, {:refuse_player_delete, object_id, make_ref()}, fn repo, _changes ->
+      case repo.get(Object, object_id) do
+        %Object{type: :player} -> {:error, :cannot_delete_player}
+        _ -> {:ok, :permitted}
+      end
+    end)
+    |> Multi.update_all(
       {:delete_object, object_id, make_ref()},
-      from(o in Object, where: o.id == ^object_id),
+      from(o in Object, where: o.id == ^object_id and o.type != :player),
       set: [deleted_at: DateTime.utc_now()]
     )
   end

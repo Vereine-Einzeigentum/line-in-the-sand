@@ -92,11 +92,23 @@ defmodule LineCore.Object do
     end
   end
 
+  @doc deprecated: "Use LineCore.Genesis.create/1"
   @doc """
   Create an object deriving from `generic_id`, inheriting its type.
 
-  The MOO idiom: you do not build a room from nothing, you derive one from the
-  generic room. Pass `type` in `attrs` to override.
+  > #### Superseded {: .warning}
+  >
+  > Use `LineCore.Genesis.create/1` or one of its helpers instead. This
+  > function defaults `type` to the generic's own, and a generic is `:generic`
+  > by construction — so deriving from `Generic PC` silently yields a
+  > `:generic` object unless every caller remembers to override. `Genesis`
+  > decides type at the call site and refuses to guess from an abstract
+  > generic. It is also atomic, which this is not: creation, placement and
+  > properties happen in one transaction rather than a sequence that can be
+  > interrupted halfway.
+  >
+  > Kept because it still behaves as documented, and because
+  > `LineCore.Object` remains the layer `Genesis` is built on.
   """
   def spawn_from(generic_id, name, attrs \\ %{}) do
     case get(generic_id) do
@@ -177,6 +189,20 @@ defmodule LineCore.Object do
       on_conflict: [set: [value: stored_value, updated_at: DateTime.utc_now()]],
       conflict_target: [:object_id, :key]
     )
+  end
+
+  @doc """
+  Remove a property defined directly on this object.
+
+  Removes only the object's *own* value — anything the prototype chain supplies
+  for the same key becomes visible again, which is the point. Returns `:ok`
+  whether or not a row was there.
+  """
+  def delete_property(object_id, key) do
+    from(p in Property, where: p.object_id == ^object_id and p.key == ^key)
+    |> Repo.delete_all()
+
+    :ok
   end
 
   @doc """

@@ -57,7 +57,14 @@ defmodule LineCore.Schemas.Object do
   end
 
   @required_fields [:type, :name]
-  @optional_fields [:description, :verbs, :deleted_at, :parent_id]
+
+  # `:id` is castable so a caller can decide an object's id *before* it exists.
+  # `LineCore.Genesis.plan/1` relies on this: it pre-generates the UUID and
+  # threads it through the `:relate` and `:set_property` events that accompany
+  # the `:create_object` event, which is what lets a whole object be described
+  # as one ordered event list without the dispatcher having to resolve
+  # forward references.
+  @optional_fields [:id, :description, :verbs, :deleted_at, :parent_id]
 
   def changeset(object, attrs) do
     object

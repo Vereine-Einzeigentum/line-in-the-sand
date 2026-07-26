@@ -67,7 +67,12 @@ defmodule LineWebWeb.PlayerTokenTest do
       assert :error = connect(UserSocket, %{"token" => PlayerToken.sign(crate.id)})
     end
 
-    test "a well-signed token for a deleted player is refused" do
+    test "a well-signed token for a removed player is refused" do
+      # Players are not deleted by any normal lifecycle — a session ending
+      # leaves the body in the world, and combat respawns rather than deletes.
+      # This constructs the state deliberately, out of band, because the socket
+      # should still refuse a token naming an object that is genuinely gone
+      # however it came to be gone.
       room = TestHarness.spawn_room("Hub")
       player = TestHarness.spawn_player_in(room, "Ghost")
       token = PlayerToken.sign(player.id)
@@ -79,6 +84,16 @@ defmodule LineWebWeb.PlayerTokenTest do
         |> Repo.update()
 
       assert :error = connect(UserSocket, %{"token" => token})
+    end
+
+    test "a well-signed token for an offline player still connects" do
+      # The ordinary case now: you log back into the body you left.
+      room = TestHarness.spawn_room("Hub")
+      player = TestHarness.spawn_player_in(room, "Returner")
+      LineCore.Catchup.mark_offline(player.id)
+
+      assert {:ok, socket} = connect(UserSocket, %{"token" => PlayerToken.sign(player.id)})
+      assert socket.assigns.player_id == player.id
     end
 
     test "connect without params is refused" do

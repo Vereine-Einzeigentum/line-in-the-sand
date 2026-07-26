@@ -45,14 +45,18 @@ defmodule LineCore.Verbs.Look do
   end
 
   defp contents_lines(ctx) do
-    others = Enum.reject(ctx.room_contents, &(&1.id == ctx.actor.id))
+    ctx.room_contents
+    |> Enum.reject(&(&1.id == ctx.actor.id))
+    |> Enum.map(fn o -> "You see: #{o.name}." <> state_suffix(o) end)
+  end
 
-    case others do
-      [] ->
-        []
-
-      objs ->
-        Enum.map(objs, fn o -> "You see: #{o.name}." end)
+  # An unattended body is still in the room and still worth describing as one.
+  # `active_state` is the general mechanism — a session marks a player offline
+  # with it, and anything else that wants a standing condition can use it too.
+  defp state_suffix(object) do
+    case Object.get_property(object.id, "active_state") do
+      nil -> ""
+      state -> " (#{state})"
     end
   end
 

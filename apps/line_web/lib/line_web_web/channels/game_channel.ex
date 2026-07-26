@@ -20,7 +20,7 @@ defmodule LineWebWeb.GameChannel do
 
   use Phoenix.Channel
 
-  alias LineCore.{Dispatcher, Object, Parser, Presence, PubSub}
+  alias LineCore.{Catchup, Dispatcher, Object, Parser, Presence, PubSub}
 
   ## Join
 
@@ -56,6 +56,16 @@ defmodule LineWebWeb.GameChannel do
 
     # Register as online
     Presence.register(player_id, %{source: :websocket, joined_at: DateTime.utc_now()})
+
+    # Somebody is driving this body again. Tell them what it lived through
+    # while they were not — the notifications sent to an actor topic with no
+    # subscriber are recoverable from the journal, and only from there.
+    case Catchup.digest(player_id) do
+      [] -> :ok
+      lines -> push(socket, "msg", %{text: Enum.join(lines, "\n")})
+    end
+
+    Catchup.mark_online(player_id)
 
     {:noreply, socket}
   end
@@ -129,6 +139,10 @@ defmodule LineWebWeb.GameChannel do
         nil -> :ok
         room_id -> PubSub.unsubscribe({:room, room_id})
       end
+
+      # The connection ends; the body does not. It stays where it was standing,
+      # marked unattended, and remains a legal target while it is.
+      Catchup.mark_offline(player_id)
     end
 
     :ok

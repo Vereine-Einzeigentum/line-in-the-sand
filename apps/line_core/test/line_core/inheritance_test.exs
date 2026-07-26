@@ -1,7 +1,7 @@
 defmodule LineCore.InheritanceTest do
   use ExUnit.Case, async: false
 
-  alias LineCore.{Object, Repo}
+  alias LineCore.{Genesis, Object, Repo}
   alias LineCore.Seed.Generics
 
   setup do
@@ -172,19 +172,38 @@ defmodule LineCore.InheritanceTest do
       second = Generics.seed()
 
       assert first.mother.id == second.mother.id
-      assert first.player.id == second.player.id
+      assert first.pc.id == second.pc.id
 
-      # Generic Player derives from Generic Being derives from the mother.
-      assert Object.ancestors(first.player.id) == [first.being.id, first.mother.id]
+      # PC and NPC split at Human, which hangs off Mob, which hangs off the
+      # mother. The only difference between the two leaves is whether anyone
+      # is driving it.
+      assert Object.ancestors(first.pc.id) == [first.human.id, first.mob.id, first.mother.id]
+      assert Object.ancestors(first.npc.id) == [first.human.id, first.mob.id, first.mother.id]
     end
 
-    test "a spawned player inherits combat defaults and verbs" do
+    test "staff branch at Mob, not at Human" do
       g = Generics.seed()
 
-      {:ok, player} = Object.spawn_from(g.player.id, "Tester", %{type: :player})
+      assert Object.ancestors(g.operator.id) == [g.agent.id, g.mob.id, g.mother.id]
+      refute g.human.id in Object.ancestors(g.operator.id)
 
-      assert Object.get_property(player.id, "hp_max") == 20
+      # The corporate ladder is the permission ladder: a Director is under a
+      # Handler, so it inherits everything a Handler is granted.
+      assert g.handler.id in Object.ancestors(g.director.id)
+      assert g.operator.id in Object.ancestors(g.shareholder.id)
+      assert g.supervisor.id in Object.ancestors(g.representative.id)
+    end
+
+    test "a spawned PC inherits its health bars, core stats and verbs" do
+      Generics.seed()
+
+      player = Genesis.player!("Tester")
+
+      # Nobody set these on the player; they resolve up the chain.
+      assert Object.get_property(player.id, "hp_max") == 50
       assert Object.get_property(player.id, "dirham") == 0
+      assert Object.get_property(player.id, "stat_iron") == 1
+      assert Object.get_property(player.id, "stress_max") == 100
 
       verbs = Object.effective_verbs(player.id)
       assert "attack" in verbs
@@ -192,11 +211,33 @@ defmodule LineCore.InheritanceTest do
       assert "look" in verbs
     end
 
+    test "a PC is sturdier than the Mob it descends from" do
+      g = Generics.seed()
+
+      assert Object.get_property(g.mob.id, "hp_max") == 20
+      assert Object.get_property(g.pc.id, "hp_max") == 50
+    end
+
+    test "only concrete generics declare instance_type" do
+      g = Generics.seed()
+
+      assert Object.own_property(g.pc.id, "instance_type") == "player"
+      assert Object.own_property(g.npc.id, "instance_type") == "npc"
+      assert Object.own_property(g.room.id, "instance_type") == "room"
+      assert Object.own_property(g.weapon.id, "instance_type") == "item"
+
+      # The abstract intermediates leave it unset on purpose, and nothing
+      # above them supplies it either.
+      for abstract <- [g.thing, g.mob, g.human, g.agent] do
+        assert Object.get_property(abstract.id, "instance_type") == nil
+      end
+    end
+
     test "generics stay out of containment and so never render in a room" do
       g = Generics.seed()
 
       assert Object.container_of(g.mother.id) == nil
-      assert Object.container_of(g.player.id) == nil
+      assert Object.container_of(g.pc.id) == nil
     end
   end
 end

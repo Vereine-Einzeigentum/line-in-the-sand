@@ -4,22 +4,34 @@ defmodule LineCore.PlaytestSession do
 
   Each session has:
   - A unique token (used as auth + identifier)
-  - An ephemeral player object in the world
+  - A player object in the world
   - A GenServer process that subscribes to the player's actor and room topics
     and accumulates messages in a bounded queue
 
   The HTTP layer creates sessions, dispatches commands through them, and reads
   the accumulated message queue for SSE/long-poll delivery.
 
-  Sessions auto-expire after `@idle_timeout` of no activity.
+  Sessions auto-expire after fifteen minutes of no activity, overridable with
+  the `:playtest_idle_timeout` application env.
+
+  ## The session is ephemeral; the player is not
+
+  Ending a session — by `terminate/1`, by idle expiry, by the process dying —
+  releases connection-scoped resources only. The player object stays in the
+  world, marked offline, exactly where it was standing. It remains visible in
+  `look`, and it remains a legal target: an unattended body can be attacked and
+  killed, which is what gives persistence stakes rather than making it scenery.
+
+  What happened while nobody was driving is recoverable — the journal recorded
+  it, and `LineCore.Catchup` reads it back on reconnect.
   """
 
   use GenServer
   require Logger
 
-  alias LineCore.{Object, PubSub}
+  alias LineCore.{Catchup, Genesis, PubSub}
 
-  @idle_timeout :timer.minutes(15)
+  @default_idle_timeout :timer.minutes(15)
   @max_queue_size 200
 
   defstruct [:token, :player_id, :room_id, :queue, :created_at, :last_activity]
@@ -61,7 +73,7 @@ defmodule LineCore.PlaytestSession do
     :exit, _ -> {:error, :no_session}
   end
 
-  @doc "Terminate the session and clean up the ephemeral player object."
+  @doc "End the session. The player object stays in the world, marked offline."
   def terminate(token) do
     GenServer.call(via(token), :terminate)
   catch
@@ -80,28 +92,27 @@ defmodule LineCore.PlaytestSession do
 
   @impl true
   def init({token, starting_room_id, name}) do
-    case Object.create(:player, name, %{}) do
+    # One transaction: the player is created, placed and given its properties,
+    # or none of it happened. The old sequence created the player, then related
+    # it in a second call, with a compensating `unrelate` that could not undo
+    # the player it was compensating for.
+    case Genesis.player(name, source: :playtest, place_in: starting_room_id) do
       {:ok, player} ->
-        case Object.relate(starting_room_id, player.id, :contains) do
-          {:ok, _} ->
-            PubSub.subscribe({:actor, player.id})
-            PubSub.subscribe({:room, starting_room_id})
+        Catchup.mark_online(player.id)
 
-            state = %__MODULE__{
-              token: token,
-              player_id: player.id,
-              room_id: starting_room_id,
-              queue: :queue.new(),
-              created_at: DateTime.utc_now(),
-              last_activity: DateTime.utc_now()
-            }
+        PubSub.subscribe({:actor, player.id})
+        PubSub.subscribe({:room, starting_room_id})
 
-            {:ok, state, @idle_timeout}
+        state = %__MODULE__{
+          token: token,
+          player_id: player.id,
+          room_id: starting_room_id,
+          queue: :queue.new(),
+          created_at: DateTime.utc_now(),
+          last_activity: DateTime.utc_now()
+        }
 
-          error ->
-            Object.unrelate(starting_room_id, player.id, :contains)
-            {:stop, {:relate_failed, error}}
-        end
+        {:ok, state, idle_timeout()}
 
       error ->
         {:stop, {:player_create_failed, error}}
@@ -118,17 +129,17 @@ defmodule LineCore.PlaytestSession do
       queue_size: :queue.len(state.queue)
     }
 
-    {:reply, {:ok, info}, touch(state), @idle_timeout}
+    {:reply, {:ok, info}, touch(state), idle_timeout()}
   end
 
   def handle_call({:dispatch, verb_module, args, raw}, _from, state) do
     result = LineCore.Dispatcher.dispatch(state.player_id, verb_module, args, raw)
-    {:reply, result, touch(state), @idle_timeout}
+    {:reply, result, touch(state), idle_timeout()}
   end
 
   def handle_call({:pull, limit}, _from, state) do
     {pulled, remaining} = take_n(state.queue, limit, [])
-    {:reply, {:ok, pulled}, %{state | queue: remaining}, @idle_timeout}
+    {:reply, {:ok, pulled}, %{state | queue: remaining}, idle_timeout()}
   end
 
   def handle_call(:terminate, _from, state) do
@@ -138,19 +149,19 @@ defmodule LineCore.PlaytestSession do
 
   @impl true
   def handle_info({:msg, _} = msg, state) do
-    {:noreply, enqueue(state, msg), @idle_timeout}
+    {:noreply, enqueue(state, msg), idle_timeout()}
   end
 
   def handle_info({:room_msg, _msg, except} = full, state) do
     if state.player_id in except do
-      {:noreply, state, @idle_timeout}
+      {:noreply, state, idle_timeout()}
     else
-      {:noreply, enqueue(state, full), @idle_timeout}
+      {:noreply, enqueue(state, full), idle_timeout()}
     end
   end
 
   def handle_info({:channel_msg, _, _} = msg, state) do
-    {:noreply, enqueue(state, msg), @idle_timeout}
+    {:noreply, enqueue(state, msg), idle_timeout()}
   end
 
   def handle_info(:timeout, state) do
@@ -160,10 +171,16 @@ defmodule LineCore.PlaytestSession do
   end
 
   def handle_info(_, state) do
-    {:noreply, state, @idle_timeout}
+    {:noreply, state, idle_timeout()}
   end
 
   ## Helpers
+
+  # Configurable so idle expiry is a testable path rather than a fifteen-minute
+  # one. Production never sets it.
+  defp idle_timeout do
+    Application.get_env(:line_core, :playtest_idle_timeout, @default_idle_timeout)
+  end
 
   defp via(token), do: {:via, Registry, {LineCore.PlaytestRegistry, token}}
 
@@ -196,18 +213,17 @@ defmodule LineCore.PlaytestSession do
     end
   end
 
+  # Ending a session tears down connection-scoped resources — this process, its
+  # subscriptions, its queue — and nothing else. The body stays in its room.
+  #
+  # It used to soft-delete the player, which destroyed a character because a
+  # *connection* ended. Persistent bodies are the intended model: a logged-out
+  # PC is structurally identical to an NPC standing in the same room, and is
+  # just as visible, just as attackable.
   defp cleanup(state) do
     PubSub.unsubscribe({:actor, state.player_id})
     PubSub.unsubscribe({:room, state.room_id})
 
-    case Object.get(state.player_id) do
-      nil ->
-        :ok
-
-      player ->
-        LineCore.Repo.update!(
-          LineCore.Schemas.Object.changeset(player, %{deleted_at: DateTime.utc_now()})
-        )
-    end
+    Catchup.mark_offline(state.player_id)
   end
 end

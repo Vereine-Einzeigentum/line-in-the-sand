@@ -25,6 +25,71 @@ defmodule LineWebWeb.GameChannelTest do
     socket
   end
 
+  # `leave/1` shuts the channel down, and `subscribe_and_join/3` linked it to
+  # this process — so unlink first or the test dies with it.
+  defp disconnect(socket) do
+    Process.unlink(socket.channel_pid)
+    leave(socket)
+    Process.sleep(50)
+    :ok
+  end
+
+  describe "the body outlives the socket" do
+    test "a player survives a websocket disconnect, marked unattended" do
+      room = TestHarness.spawn_room("Hub", "A room.")
+      player = TestHarness.spawn_player_in(room, "Leaver")
+      socket = connect_player(player)
+
+      Process.sleep(50)
+      assert LineCore.Presence.online?(player.id)
+
+      disconnect(socket)
+
+      # The connection is gone; the character is not.
+      refute LineCore.Presence.online?(player.id)
+      assert %{id: _} = Object.get(player.id)
+
+      assert %{id: room_id} = Object.container_of(player.id)
+      assert room_id == room.id
+      assert Object.get_property(player.id, "active_state") == LineCore.Catchup.offline_state()
+    end
+
+    test "rejoining clears the unattended marker" do
+      room = TestHarness.spawn_room("Hub", "A room.")
+      player = TestHarness.spawn_player_in(room, "Returner")
+
+      player |> connect_player() |> disconnect()
+      assert Object.get_property(player.id, "active_state") != nil
+
+      _socket = connect_player(player)
+      Process.sleep(50)
+      assert Object.get_property(player.id, "active_state") == nil
+    end
+
+    test "a player killed while away is told on rejoin" do
+      safehouse = TestHarness.spawn_room("Safehouse", "Restored.")
+      System.put_env("SAFEHOUSE_ROOM_ID", safehouse.id)
+      on_exit(fn -> System.delete_env("SAFEHOUSE_ROOM_ID") end)
+
+      room = TestHarness.spawn_room("Arena", "A pit.")
+      attacker = TestHarness.spawn_player_in(room, "Attacker")
+      victim = TestHarness.spawn_player_in(room, "Sleeper")
+      Object.set_property(victim.id, "hp_current", 1)
+
+      victim |> connect_player() |> disconnect()
+
+      TestHarness.dispatch(attacker, LineCore.Verbs.Attack, ["Sleeper"])
+      Process.sleep(50)
+
+      # Rejoining replays what was published to an actor topic nobody was on.
+      _socket = connect_player(victim)
+
+      assert_push "msg", %{text: text}
+      assert text =~ "While you were away:"
+      assert text =~ "Everything goes dark"
+    end
+  end
+
   test "joining game:<player_id> subscribes and registers presence" do
     room = TestHarness.spawn_room("Hub", "A room.")
     player = TestHarness.spawn_player_in(room, "Joiner")

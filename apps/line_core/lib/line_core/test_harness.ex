@@ -22,43 +22,73 @@ defmodule LineCore.TestHarness do
       end
   """
 
-  alias LineCore.{Dispatcher, Object, PubSub}
+  alias LineCore.{Dispatcher, Genesis, Object, PubSub}
+  alias LineCore.Seed.Generics
 
   ## Spawning helpers
+  #
+  # Every spawner goes through `LineCore.Genesis`, so harness-built objects
+  # derive from the generics exactly like seeded content does. That is what
+  # makes the verb, combat and scrap-loop suites exercise inheritance
+  # transitively rather than testing a path production never takes.
+  #
+  # Options are keyword lists — `description:`, `verbs:`, `properties:`,
+  # `template:`, `source:`. The old third-argument map mixed schema fields and
+  # properties with no way to tell them apart.
+
+  @doc """
+  Ensure the prototype chain exists.
+
+  Called by every spawner. Sandbox tests roll back per test, so the generics
+  have to be re-seeded inside each one; the `mother/0` check keeps that to a
+  single query when they are already there. Deliberately *not* cached across
+  tests — a stale cross-test cache would silently corrupt unrelated tests.
+  """
+  def ensure_generics do
+    case Generics.mother() do
+      nil -> Generics.seed()
+      _ -> :ok
+    end
+  end
 
   @doc "Create a room with the given name and description."
   def spawn_room(name, description \\ "An unremarkable room.") do
-    {:ok, room} = Object.create(:room, name, %{description: description})
-    room
+    ensure_generics()
+    Genesis.room!(name, source: :hand, description: description)
   end
 
   @doc "Create a player and subscribe the calling test process to their actor topic."
-  def spawn_player(name \\ "Tester") do
-    {:ok, player} = Object.create(:player, name)
+  def spawn_player(name \\ "Tester", opts \\ []) do
+    ensure_generics()
+    player = Genesis.player!(name, with_source(opts))
     :ok = PubSub.subscribe({:actor, player.id})
     player
   end
 
   @doc "Create a player and place them in the given room. Subscribes caller to actor topic."
-  def spawn_player_in(room, name \\ "Tester") do
-    player = spawn_player(name)
-    {:ok, _} = Object.relate(room.id, player.id, :contains)
+  def spawn_player_in(room, name \\ "Tester", opts \\ []) do
+    ensure_generics()
+    player = Genesis.player!(name, opts |> with_source() |> Keyword.put(:place_in, id_of(room)))
+    :ok = PubSub.subscribe({:actor, player.id})
     player
   end
 
   @doc "Create an item and place it in the given container."
-  def spawn_item_in(container, name, attrs \\ %{}) do
-    {:ok, item} = Object.create(:item, name, attrs)
-    {:ok, _} = Object.relate(container.id, item.id, :contains)
-    item
+  def spawn_item_in(container, name, opts \\ []) do
+    ensure_generics()
+    Genesis.item!(container, name, with_source(opts))
   end
 
   @doc "Create an NPC and place it in the given room."
-  def spawn_npc_in(room, name, attrs \\ %{}) do
-    {:ok, npc} = Object.create(:npc, name, attrs)
-    {:ok, _} = Object.relate(room.id, npc.id, :contains)
-    npc
+  def spawn_npc_in(room, name, opts \\ []) do
+    ensure_generics()
+    Genesis.npc!(room, name, with_source(opts))
   end
+
+  defp with_source(opts), do: Keyword.put_new(opts, :source, :hand)
+
+  defp id_of(%{id: id}), do: id
+  defp id_of(id) when is_binary(id), do: id
 
   @doc "Connect two rooms with an exit in the given direction. Bidirectional unless opts[:one_way]."
   def connect_rooms(from, to, direction, opts \\ []) do
