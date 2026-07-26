@@ -253,16 +253,69 @@ defmodule LineCore.Object do
     |> Repo.delete_all()
   end
 
-  @doc "Move an object from its current container to a new one. Atomic."
-  def move(object_id, new_container_id, type \\ :contains) do
-    Repo.transaction(fn ->
-      from(r in Relationship,
-        where: r.to_id == ^object_id and r.type == ^type
-      )
-      |> Repo.delete_all()
+  @doc """
+  Move an object from its current container to a new one. Atomic.
 
-      relate(new_container_id, object_id, type)
-    end)
+  Refuses a move that would put an object inside itself, directly or through
+  any depth of nesting. Without that, location resolution has no base case —
+  drive a vehicle into its own trailer and every walk up the containment chain
+  runs forever.
+  """
+  def move(object_id, new_container_id, type \\ :contains) do
+    if would_cycle?(object_id, new_container_id, type) do
+      {:error, :containment_cycle}
+    else
+      Repo.transaction(fn ->
+        from(r in Relationship,
+          where: r.to_id == ^object_id and r.type == ^type
+        )
+        |> Repo.delete_all()
+
+        relate(new_container_id, object_id, type)
+      end)
+    end
+  end
+
+  @doc """
+  Would placing `object_id` inside `container_id` create a containment cycle?
+
+  True when they are the same object, or when the proposed container is
+  somewhere inside the object already.
+  """
+  def would_cycle?(object_id, container_id, type \\ :contains)
+  def would_cycle?(id, id, _type), do: true
+
+  def would_cycle?(object_id, container_id, type) do
+    object_id in container_chain(container_id, type)
+  end
+
+  @doc """
+  The containers enclosing an object, innermost first, excluding the object.
+
+  Capped and cycle-tolerant in the same spirit as `ancestors/1`: bad data
+  already in the graph degrades to a finite list instead of hanging.
+  """
+  def container_chain(object_id, type \\ :contains) do
+    walk_containers(container_id_of(object_id, type), MapSet.new([object_id]), [])
+  end
+
+  defp walk_containers(nil, _seen, acc), do: Enum.reverse(acc)
+
+  defp walk_containers(id, seen, acc) do
+    cond do
+      MapSet.member?(seen, id) -> Enum.reverse(acc)
+      length(acc) >= @max_depth -> Enum.reverse(acc)
+      true -> walk_containers(container_id_of(id, :contains), MapSet.put(seen, id), [id | acc])
+    end
+  end
+
+  defp container_id_of(object_id, type) do
+    from(r in Relationship,
+      where: r.to_id == ^object_id and r.type == ^type,
+      select: r.from_id,
+      limit: 1
+    )
+    |> Repo.one()
   end
 
   ## Containment queries

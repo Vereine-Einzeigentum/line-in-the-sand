@@ -98,6 +98,23 @@ defmodule LineCore.Dispatcher do
     |> Repo.transaction()
   end
 
+  @doc """
+  Fold persistent events into `multi`, ignoring notification events.
+
+  Public so callers outside the verb pipeline — `LineCore.Genesis` most of all
+  — materialise event lists through *these* appliers rather than keeping a
+  second copy. Keeping one implementation is the point: the rules for what
+  `{:move, ...}` or `{:delete_object, ...}` mean to the database, including
+  the cycle and player-deletion refusals, live here and nowhere else. A second
+  applier is a second set of rules, and it will drift.
+
+  No `Context` is involved because no persistent event consults one; only
+  broadcasting does, and that is not this function's job.
+  """
+  def apply_to_multi(multi, events) do
+    Enum.reduce(events, multi, fn event, acc -> apply_event_to_multi(acc, event, nil) end)
+  end
+
   defp apply_event_to_multi(multi, {:set_property, object_id, key, value}, _ctx) do
     stored = if is_map(value), do: value, else: %{"v" => value}
 
@@ -121,10 +138,22 @@ defmodule LineCore.Dispatcher do
     )
   end
 
+  # An object cannot be moved inside itself, at any depth. The guard lives here
+  # as well as in `Object.move/3` for the same reason the player-delete refusal
+  # does: this is where events become writes, so a verb emitting a bad `:move`
+  # cannot route around it. Containment cycles are not a cosmetic problem —
+  # every walk up the containment chain loses its base case.
   defp apply_event_to_multi(multi, {:move, object_id, to_container_id, rel_type}, _ctx) do
     import Ecto.Query
 
     multi
+    |> Multi.run({:check_move, object_id, make_ref()}, fn _repo, _changes ->
+      if LineCore.Object.would_cycle?(object_id, to_container_id, rel_type) do
+        {:error, :containment_cycle}
+      else
+        {:ok, :permitted}
+      end
+    end)
     |> Multi.delete_all(
       {:remove_old_container, object_id, make_ref()},
       from(r in Relationship, where: r.to_id == ^object_id and r.type == ^rel_type)

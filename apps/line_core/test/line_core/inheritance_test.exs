@@ -187,7 +187,7 @@ defmodule LineCore.InheritanceTest do
 
       {:ok, player} = Object.spawn_from(g.pc.id, "Tester", %{type: :player})
 
-      assert Object.get_property(player.id, "hp_max") == 20
+      assert Object.get_property(player.id, "hp_max") == 50
       assert Object.get_property(player.id, "dirham") == 0
 
       verbs = Object.effective_verbs(player.id)

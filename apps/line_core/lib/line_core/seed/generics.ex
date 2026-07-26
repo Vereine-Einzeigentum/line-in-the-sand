@@ -139,6 +139,15 @@ defmodule LineCore.Seed.Generics do
     # ── Defaults live on generics so descendants only store what differs ───────
     Object.set_property(mob.id, "hp_max", 20)
     Object.set_property(mob.id, "hp_current", 20)
+
+    # A PC is sturdier than a baseline Mob. 50 is what `LineCore.Combat`
+    # documents as the player HP model and falls back to when nothing is set,
+    # so the generic and the fallback now agree instead of contradicting each
+    # other — which they quietly did for as long as nothing descended from the
+    # generics and the fallback was the only value anyone ever saw.
+    Object.set_property(pc.id, "hp_max", 50)
+    Object.set_property(pc.id, "hp_current", 50)
+
     Object.set_property(pc.id, "dirham", 0)
     Object.set_property(scrap.id, "scrap_value", 5)
     Object.set_property(weapon.id, "damage", 3)
