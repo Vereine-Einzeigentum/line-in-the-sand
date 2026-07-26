@@ -4,11 +4,30 @@ defmodule LineCore.Seed.Generics do
   from it.
 
   This is the MOO idiom. You do not build a room from nothing; you derive one
-  from the generic room, which already knows what rooms are like. Anything a
+  from the Room generic, which already knows what rooms are like. Anything a
   descendant does not define resolves upward, so changing a generic changes
   every object descended from it — including objects an object model generates
   later, which is the point: a generated NPC should inherit NPC-ness rather
   than mint every property from scratch.
+
+  ## Taxonomy
+
+      The Line  (mother — everything descends from here)
+      ├── Room                      instance_type: "room"
+      ├── Thing                     (abstract)
+      │   ├── Weapon                instance_type: "item"
+      │   └── Scrap                 instance_type: "item"
+      └── Mob                       (abstract)
+          ├── Human                 (abstract)
+          │   ├── NPC               instance_type: "npc"
+          │   └── PC                instance_type: "player"
+          └── Agent                 (abstract)
+              └── Operator          instance_type: "npc"
+
+  **Only leaf generics declare `instance_type`.**  Abstract intermediates
+  (`Thing`, `Mob`, `Human`, `Agent`) deliberately omit it, so spawning from
+  them via `LineCore.Genesis` returns `{:error, :abstract_generic}` rather than
+  silently producing a wrongly-typed object.
 
   Idempotent, keyed on the mother object's name.
   """
@@ -36,61 +55,91 @@ defmodule LineCore.Seed.Generics do
         verbs: ["look", "examine"]
       })
 
-    # Every thing that can be looked at, carried, or talked to hangs off one of
-    # these. Verbs are additive down the chain, so each generic lists only what
-    # it introduces.
+    # ── Rooms ────────────────────────────────────────────────────────────────
     {:ok, room} =
-      Object.create(:generic, "Generic Room", %{
+      Object.create(:generic, "Room", %{
         parent_id: mother.id,
         description: "A space with edges and ways out.",
         verbs: ["go"]
       })
 
+    # ── Things ───────────────────────────────────────────────────────────────
     {:ok, thing} =
-      Object.create(:generic, "Generic Thing", %{
+      Object.create(:generic, "Thing", %{
         parent_id: mother.id,
         description: "An object with mass, salvage value, and a history.",
         verbs: ["get", "drop", "give"]
       })
 
-    {:ok, being} =
-      Object.create(:generic, "Generic Being", %{
-        parent_id: mother.id,
-        description: "Something alive enough to be hurt.",
-        verbs: ["say", "emote", "attack"]
-      })
-
-    {:ok, player} =
-      Object.create(:generic, "Generic Player", %{
-        parent_id: being.id,
-        description: "A resident of THE LINE, restored more times than they admit.",
-        verbs: ["inventory", "score", "who", "help", "desc", "text"]
-      })
-
-    {:ok, npc} =
-      Object.create(:generic, "Generic NPC", %{
-        parent_id: being.id,
-        description: "Someone who lives here and was not summoned by a login."
-      })
-
     {:ok, weapon} =
-      Object.create(:generic, "Generic Weapon", %{
+      Object.create(:generic, "Weapon", %{
         parent_id: thing.id,
         description: "A thing shaped, or repurposed, for damage.",
         verbs: ["wield", "unwield"]
       })
 
     {:ok, scrap} =
-      Object.create(:generic, "Generic Scrap", %{
+      Object.create(:generic, "Scrap", %{
         parent_id: thing.id,
         description: "Material worth more taken apart than whole.",
         verbs: ["scrap", "sell"]
       })
 
-    # Defaults live on the generics so descendants only store what differs.
-    Object.set_property(being.id, "hp_max", 20)
-    Object.set_property(being.id, "hp_current", 20)
-    Object.set_property(player.id, "dirham", 0)
+    # ── Beings ───────────────────────────────────────────────────────────────
+    {:ok, mob} =
+      Object.create(:generic, "Mob", %{
+        parent_id: mother.id,
+        description: "Something alive enough to be hurt.",
+        verbs: ["say", "emote", "attack"]
+      })
+
+    {:ok, human} =
+      Object.create(:generic, "Human", %{
+        parent_id: mob.id,
+        description: "A resident of THE LINE, shaped by it."
+      })
+
+    {:ok, npc} =
+      Object.create(:generic, "NPC", %{
+        parent_id: human.id,
+        description: "Someone who lives here and was not summoned by a login."
+      })
+
+    {:ok, pc} =
+      Object.create(:generic, "PC", %{
+        parent_id: human.id,
+        description: "A resident of THE LINE, restored more times than they admit.",
+        verbs: ["inventory", "score", "who", "help", "desc", "text"]
+      })
+
+    # ── Staff ─────────────────────────────────────────────────────────────────
+    {:ok, agent} =
+      Object.create(:generic, "Agent", %{
+        parent_id: mob.id,
+        description: "An entity of the building, not of the residents."
+      })
+
+    {:ok, operator} =
+      Object.create(:generic, "Operator", %{
+        parent_id: agent.id,
+        description: "A named presence with responsibilities."
+      })
+
+    # ── instance_type on leaf generics ────────────────────────────────────────
+    # Only leaves declare this. Genesis reads it to resolve the Ecto object type
+    # when the caller does not name it explicitly.  Abstract intermediates (Mob,
+    # Human, Agent, Thing) are left unset so spawning from them is a hard error.
+    Object.set_property(room.id, "instance_type", "room")
+    Object.set_property(weapon.id, "instance_type", "item")
+    Object.set_property(scrap.id, "instance_type", "item")
+    Object.set_property(npc.id, "instance_type", "npc")
+    Object.set_property(pc.id, "instance_type", "player")
+    Object.set_property(operator.id, "instance_type", "npc")
+
+    # ── Defaults live on generics so descendants only store what differs ───────
+    Object.set_property(mob.id, "hp_max", 20)
+    Object.set_property(mob.id, "hp_current", 20)
+    Object.set_property(pc.id, "dirham", 0)
     Object.set_property(scrap.id, "scrap_value", 5)
     Object.set_property(weapon.id, "damage", 3)
 
@@ -98,24 +147,30 @@ defmodule LineCore.Seed.Generics do
       mother: mother,
       room: room,
       thing: thing,
-      being: being,
-      player: player,
+      mob: mob,
+      human: human,
       npc: npc,
+      pc: pc,
       weapon: weapon,
-      scrap: scrap
+      scrap: scrap,
+      agent: agent,
+      operator: operator
     }
   end
 
   defp collect(mother) do
     %{
       mother: mother,
-      room: find("Generic Room"),
-      thing: find("Generic Thing"),
-      being: find("Generic Being"),
-      player: find("Generic Player"),
-      npc: find("Generic NPC"),
-      weapon: find("Generic Weapon"),
-      scrap: find("Generic Scrap")
+      room: find("Room"),
+      thing: find("Thing"),
+      mob: find("Mob"),
+      human: find("Human"),
+      npc: find("NPC"),
+      pc: find("PC"),
+      weapon: find("Weapon"),
+      scrap: find("Scrap"),
+      agent: find("Agent"),
+      operator: find("Operator")
     }
   end
 
