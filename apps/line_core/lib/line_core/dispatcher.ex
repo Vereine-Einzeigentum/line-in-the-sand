@@ -138,14 +138,17 @@ defmodule LineCore.Dispatcher do
     )
   end
 
-  # An object cannot be moved inside itself, at any depth. The guard lives here
-  # as well as in `Object.move/3` for the same reason the player-delete refusal
-  # does: this is where events become writes, so a verb emitting a bad `:move`
-  # cannot route around it. Containment cycles are not a cosmetic problem —
-  # every walk up the containment chain loses its base case.
-  defp apply_event_to_multi(multi, {:move, object_id, to_container_id, rel_type}, _ctx) do
-    import Ecto.Query
-
+  # An object cannot be moved inside itself, at any depth — not by walking.
+  # The guard lives here as well as in `Object.move/4` for the same reason the
+  # player-delete refusal does: this is where events become writes, so a verb
+  # emitting a bad `:move` cannot route around it.
+  #
+  # `:force_move` is the same write without the check. A container inside
+  # itself is impossible geometry and the building is allowed impossible
+  # geometry; players are not. Keeping it a separate event rather than a flag
+  # means the journal records *which* it was, so admin geometry is legible in
+  # the audit trail instead of looking like an ordinary move.
+  defp apply_event_to_multi(multi, {:move, object_id, to_container_id, rel_type}, ctx) do
     multi
     |> Multi.run({:check_move, object_id, make_ref()}, fn _repo, _changes ->
       if LineCore.Object.would_cycle?(object_id, to_container_id, rel_type) do
@@ -154,6 +157,13 @@ defmodule LineCore.Dispatcher do
         {:ok, :permitted}
       end
     end)
+    |> apply_event_to_multi({:force_move, object_id, to_container_id, rel_type}, ctx)
+  end
+
+  defp apply_event_to_multi(multi, {:force_move, object_id, to_container_id, rel_type}, _ctx) do
+    import Ecto.Query
+
+    multi
     |> Multi.delete_all(
       {:remove_old_container, object_id, make_ref()},
       from(r in Relationship, where: r.to_id == ^object_id and r.type == ^rel_type)

@@ -108,6 +108,19 @@ defmodule LineCore.ContainmentTest do
       assert %{id: id} = Object.container_of(crate.id)
       assert id == other.id
     end
+
+    test "force: true permits impossible geometry, and walks still terminate" do
+      room = TestHarness.spawn_room("Hub")
+      bag = TestHarness.spawn_item_in(room, "bag")
+
+      assert {:ok, _} = Object.move(bag.id, bag.id, :contains, force: true)
+
+      # The bag is inside itself. Nothing may hang as a result.
+      chain = Object.container_chain(bag.id)
+      assert is_list(chain)
+      assert length(chain) <= 16
+      assert Enum.any?(Object.contents(bag.id), &(&1.id == bag.id))
+    end
   end
 
   describe "the dispatcher refuses cycles too" do
@@ -126,6 +139,20 @@ defmodule LineCore.ContainmentTest do
       # Nothing moved.
       assert %{id: room_id} = Object.container_of(truck.id)
       assert room_id == room.id
+    end
+
+    test ":force_move is the admin door through the same guard" do
+      room = TestHarness.spawn_room("Hub")
+      truck = TestHarness.spawn_item_in(room, "truck")
+      trailer = TestHarness.spawn_item_in(truck, "trailer")
+
+      assert {:ok, _} =
+               Ecto.Multi.new()
+               |> Dispatcher.apply_to_multi([{:force_move, truck.id, trailer.id, :contains}])
+               |> Repo.transaction()
+
+      # The cycle exists on purpose, and the chain walk still terminates.
+      assert length(Object.container_chain(trailer.id)) <= 16
     end
 
     test "an ordinary :move event still applies" do
