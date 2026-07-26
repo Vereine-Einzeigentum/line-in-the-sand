@@ -59,12 +59,10 @@ defmodule LineCore.Combat do
 
     [
       {:set_property, target_id, "hp_current", new_hp},
-      {:notify_actor,
-       "You hit #{target.name} for #{damage} damage. (#{new_hp} HP remaining)"},
+      {:notify_actor, "You hit #{target.name} for #{damage} damage. (#{new_hp} HP remaining)"},
       {:notify_object, target_id,
        "#{attacker.name} hits you for #{damage} damage. (#{new_hp} HP remaining)"},
-      {:notify_room, "#{attacker.name} hits #{target.name}.",
-       except: [attacker_id, target_id]}
+      {:notify_room, "#{attacker.name} hits #{target.name}.", except: [attacker_id, target_id]}
     ]
   end
 
@@ -115,6 +113,7 @@ defmodule LineCore.Combat do
       |> Object.contents()
       |> Enum.filter(&(&1.type == :item))
 
+    equipped = Object.equipped(victim_id)
     room = Object.container_of(victim_id) || %{id: nil}
 
     case room.id do
@@ -122,13 +121,26 @@ defmodule LineCore.Combat do
         []
 
       room_id ->
-        Enum.flat_map(carried, fn item ->
-          [
-            {:move, item.id, room_id, :contains},
-            {:notify_room, "#{victim.name}'s #{item.name} clatters to the ground.",
-             except: [victim_id]}
-          ]
-        end)
+        carry_drops =
+          Enum.flat_map(carried, fn item ->
+            [
+              {:move, item.id, room_id, :contains},
+              {:notify_room, "#{victim.name}'s #{item.name} clatters to the ground.",
+               except: [victim_id]}
+            ]
+          end)
+
+        equip_drops =
+          Enum.flat_map(equipped, fn {rel_type, item} ->
+            [
+              {:unrelate, victim_id, item.id, rel_type},
+              {:relate, room_id, item.id, :contains},
+              {:notify_room, "#{victim.name}'s #{item.name} clatters to the ground.",
+               except: [victim_id]}
+            ]
+          end)
+
+        carry_drops ++ equip_drops
     end
   end
 

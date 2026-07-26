@@ -47,6 +47,8 @@ defmodule LineCore.Verb do
           {:set_property, object_id :: binary(), key :: String.t(), value :: term()}
           | {:delete_property, object_id :: binary(), key :: String.t()}
           | {:move, object_id :: binary(), to_container_id :: binary(), rel_type :: atom()}
+          | {:relate, from_id :: binary(), to_id :: binary(), rel_type :: atom()}
+          | {:unrelate, from_id :: binary(), to_id :: binary(), rel_type :: atom()}
           | {:create_object, attrs :: map()}
           | {:delete_object, object_id :: binary()}
           | {:notify_actor, message :: String.t()}

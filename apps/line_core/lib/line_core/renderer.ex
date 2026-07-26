@@ -67,23 +67,12 @@ defmodule LineCore.Renderer do
   defp render_attachments(_), do: []
 
   defp wielded_and_worn(object_id) do
-    import Ecto.Query
-    alias LineCore.{Repo, Schemas.Relationship}
-
-    from(o in LineCore.Schemas.Object,
-      join: r in Relationship,
-      on: r.to_id == o.id,
-      where:
-        r.from_id == ^object_id and
-          r.type in [:wields_main, :wields_off, :wears] and
-          is_nil(o.deleted_at),
-      select: {r.type, o.name}
-    )
-    |> Repo.all()
+    object_id
+    |> Object.equipped()
     |> Enum.map(fn
-      {:wields_main, name} -> "Wielding #{name} in main hand."
-      {:wields_off, name} -> "Wielding #{name} in off hand."
-      {:wears, name} -> "Wearing #{name}."
+      {:wields_main, o} -> "Wielding #{o.name} in main hand."
+      {:wields_off, o} -> "Wielding #{o.name} in off hand."
+      {:wears, o} -> "Wearing #{o.name}."
     end)
   end
 

@@ -14,9 +14,7 @@ defmodule LineCore.Verbs.Attack do
 
   @behaviour LineCore.Verb
 
-  alias LineCore.{Combat, Object, Repo}
-  alias LineCore.Schemas.Relationship
-  import Ecto.Query
+  alias LineCore.{Combat, Object}
 
   @base_unarmed_damage 10
 
@@ -24,7 +22,12 @@ defmodule LineCore.Verbs.Attack do
   def execute(_ctx, []), do: {:error, :attack_who}
 
   def execute(ctx, [target_name]) do
-    target = find_target(ctx, target_name)
+    candidates =
+      Enum.filter(ctx.room_contents, fn o ->
+        o.id != ctx.actor.id and o.type in [:player, :npc]
+      end)
+
+    target = Object.find_by_name(candidates, target_name)
 
     cond do
       target == nil ->
@@ -56,34 +59,10 @@ defmodule LineCore.Verbs.Attack do
 
   ## Helpers
 
-  defp find_target(ctx, name) do
-    name_down = String.downcase(name)
-
-    Enum.find(ctx.room_contents, fn o ->
-      o.id != ctx.actor.id and
-        o.type in [:player, :npc] and
-        (String.downcase(o.name) == name_down or
-           String.contains?(String.downcase(o.name), name_down))
-    end)
-  end
-
   defp compute_damage(actor_id) do
-    case wielded_weapon(actor_id) do
-      nil -> @base_unarmed_damage
-      weapon -> Object.get_property(weapon.id, "damage", @base_unarmed_damage)
+    case Object.related_by(actor_id, :wields_main) do
+      [] -> @base_unarmed_damage
+      [weapon | _] -> Object.get_property(weapon.id, "damage", @base_unarmed_damage)
     end
-  end
-
-  defp wielded_weapon(actor_id) do
-    from(o in LineCore.Schemas.Object,
-      join: r in Relationship,
-      on: r.to_id == o.id,
-      where:
-        r.from_id == ^actor_id and
-          r.type == :wields_main and
-          is_nil(o.deleted_at),
-      limit: 1
-    )
-    |> Repo.one()
   end
 end

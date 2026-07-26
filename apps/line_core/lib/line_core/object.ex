@@ -31,7 +31,7 @@ defmodule LineCore.Object do
   end
 
   @doc "Fetch an object by id or raise."
-  def get!(id), do: get(id) || raise "object not found: #{id}"
+  def get!(id), do: get(id) || raise("object not found: #{id}")
 
   ## Properties
 
@@ -163,6 +163,46 @@ defmodule LineCore.Object do
     )
     |> Repo.one()
   end
+
+  ## Name search
+
+  @doc "Find the first object in a list whose name matches (case-insensitive exact or substring)."
+  def find_by_name(objects, name) do
+    name_down = String.downcase(name)
+
+    Enum.find(objects, fn o ->
+      String.downcase(o.name) == name_down or
+        String.contains?(String.downcase(o.name), name_down)
+    end)
+  end
+
+  ## Equipment / relationship queries
+
+  @doc "All objects related FROM owner_id by the given relationship type."
+  def related_by(owner_id, rel_type) when is_atom(rel_type) do
+    from(o in Object,
+      join: r in Relationship,
+      on: r.to_id == o.id,
+      where: r.from_id == ^owner_id and r.type == ^rel_type and is_nil(o.deleted_at)
+    )
+    |> Repo.all()
+  end
+
+  @doc "All wielded and worn objects. Returns [{rel_type, object}]."
+  def equipped(owner_id) do
+    from(o in Object,
+      join: r in Relationship,
+      on: r.to_id == o.id,
+      where:
+        r.from_id == ^owner_id and
+          r.type in [:wields_main, :wields_off, :wears] and
+          is_nil(o.deleted_at),
+      select: {r.type, o}
+    )
+    |> Repo.all()
+  end
+
+  ## Direction canonicalization
 
   @directions %{
     "n" => "north",
