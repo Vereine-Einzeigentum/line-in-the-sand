@@ -99,7 +99,7 @@ defmodule LineCore.PlaytestSession do
     {:ok, state, @idle_timeout}
   rescue
     err ->
-      {:stop, {:player_create_failed, err}}
+      {:stop, {:player_create_failed, Exception.message(err)}}
   end
 
   @impl true

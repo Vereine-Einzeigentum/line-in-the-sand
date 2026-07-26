@@ -303,7 +303,13 @@ defmodule LineCore.Genesis do
         {:error, :abstract_generic}
 
       type_str when is_binary(type_str) ->
-        {:ok, String.to_existing_atom(type_str)}
+        case type_str do
+          "room" -> {:ok, :room}
+          "item" -> {:ok, :item}
+          "npc" -> {:ok, :npc}
+          "player" -> {:ok, :player}
+          other -> {:error, {:unknown_instance_type, other}}
+        end
     end
   end
 
@@ -313,10 +319,11 @@ defmodule LineCore.Genesis do
   defp validate_template_resolved(other),
     do: {:error, {:template_not_resolved, other}}
 
+  defp validate_name(""), do: {:error, :name_empty}
+
   defp validate_name(name) when is_binary(name) and byte_size(name) >= 1 and byte_size(name) <= 120,
     do: {:ok, name}
 
-  defp validate_name(""), do: {:error, :name_empty}
   defp validate_name(name) when is_binary(name), do: {:error, :name_too_long}
   defp validate_name(_), do: {:error, :name_invalid}
 

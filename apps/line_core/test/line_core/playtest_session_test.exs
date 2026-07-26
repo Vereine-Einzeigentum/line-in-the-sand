@@ -97,7 +97,8 @@ defmodule LineCore.PlaytestSessionTest do
     {:ok, info} = PlaytestSession.info(token)
     player_id = info.player_id
 
-    # Directly invoke cleanup to simulate idle expiry without waiting 15 minutes
+    # Use terminate/1 (which calls the same cleanup as idle expiry) so we don't
+    # have to wait 15 minutes for the real timeout to fire.
     PlaytestSession.terminate(token)
     Process.sleep(50)
 
