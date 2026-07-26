@@ -5,14 +5,9 @@ Guidance for AI assistants (and humans) working in this repository.
 ## What this is
 
 **LINE IN THE SAND** is a multiplayer text **MOO** (MUD, Object-Oriented) set in
-THE LINE / NEOM. Players connect over the web and issue text commands (`look`,
-`go north`, `attack fence`, `scrap`, `sell knife to fence`) that mutate a shared,
-persistent world graph. It is an Elixir/Phoenix umbrella project backed by
-PostgreSQL.
-
-The project is early — it is at **Phase 0** (closed playtest spine). The core
-object graph, verb dispatch, persistence, combat, presence, an HTTP playtest API,
-and a websocket channel are working. `line_world` and `line_ml` are still stubs.
+THE LINE / NEOM. Players connect via webclient/mobile app and issue text commands (`look`,
+`north`, `kill jackass`, `scrap`, `sell knife to guy`) that mutate a shared,
+persistent world graph. It is an Elixir project, and rn Phoenix and Bandit support this.
 
 ## Stack
 
@@ -23,7 +18,7 @@ and a websocket channel are working. `line_world` and `line_ml` are still stubs.
 - **Phoenix.PubSub** for in-process broadcast; **Phoenix Channels** for websockets
 - No Tailwind / CSS framework, no esbuild — static CSS is served from
   `apps/line_web/priv/static/assets/`. Do not add a frontend build pipeline
-  without checking first; it was deliberately omitted. The Frontend is the Client. The Repo is the server.
+  without checking with a human.
 
 ## Umbrella layout
 
@@ -52,18 +47,13 @@ verbs are pure functions that emit events the dispatcher applies.**
 
 Three Ecto schemas in `apps/line_core/lib/line_core/schemas/`:
 
-- **`Object`** (`objects` table) — every player, room, item, NPC, exit. Has
-  `type` (`:player | :room | :item | :npc | :exit | :generic`), `name`,
-  `description`, `verbs` (string list), `parent_id` (prototype), and
-  `deleted_at` (soft delete). UUID (`binary_id`) primary keys throughout.
-- **`Property`** (`object_properties` table) — EAV key/value attached to an
-  object. `value` is **JSONB**. Scalars are wrapped as `%{"v" => value}` on the
-  way in and unwrapped on the way out (see `LineCore.Object.get_property/2`).
-  Examples: `hp_current`, `hp_max`, `dirham`, `stat_wire`, `skill_scrap`,
-  `custom_description`, `location_phrase`, `active_state`.
-- **`Relationship`** (`object_relationships` table) — directed edges. Types:
-  `:contains`, `:exit_to`, `:owns`, `:wields_main`, `:wields_off`, `:wears`,
-  `:follows`, `:targeting`. Per-edge `metadata` JSONB (e.g. exit `direction`).
+- **`Object`** (`objects` table) — every player, room, item, NPC, exit... everything, even skills, attributes, factions, and damage varieties. A property is either an inert string, a verb, or a reference to an object, sometimes with a numeric value attached. That includes all of the following:
+
+-  `description`, `verbs` (string list), `parent_id` (prototype), and UUID (`hex_id`) throughout.
+- **`Property`** (`object_properties` table) — EAV key/value attached to an object.
+- **`Relationship`** (`object_relationships` table) — edges.
+-  `:contains`, `:exit_to`, `:owns`, `:wields_main`, `:wields_off`, `:wears`,
+ - `:follows`, `:targeting`. Per-edge `metadata`  (e.g. exit `direction`).
 
 **Always go through `LineCore.Object`** for graph access — it handles property
 casting, containment (`contents/1`, `container_of/1`), exits (`exits/1`,
@@ -73,26 +63,6 @@ and `verbs/unwield.ex` currently do; that's debt, not a pattern to copy.)
 
 ### Prototype inheritance (generics)
 
-MOO-style, and the reason `parent_id` exists. Objects derive from **generics** —
-`:generic`-typed prototypes seeded by `LineCore.Seed.Generics`, rooted at a
-mother object (`The Line`) with `Generic Room`, `Generic Thing`, `Generic Being`
-→ `Generic Player` / `Generic NPC`, and `Generic Weapon` / `Generic Scrap`.
-
-- **Properties resolve up the chain**, nearest wins. An object stores only what
-  differs from its generic; `Object.get_property/2` falls back through
-  `ancestors/1`. Editing a generic changes every descendant live. Use
-  `own_property/2` / `own_properties/1` when you specifically need
-  non-inherited values.
-- **Verbs union up the chain** (`effective_verbs/1`) — a generic grants
-  capabilities, a descendant adds its own.
-- **`spawn_from/3`** is the idiomatic constructor: derive from a generic and
-  inherit its type. This is what the object model should use to mint NPCs and
-  items rather than setting every property from scratch.
-- **Cycles are refused** by `set_parent/2`, and chain walking is capped and
-  cycle-tolerant so bad data degrades instead of hanging.
-- Ancestor walking deliberately **ignores `deleted_at`** — soft-deleting a
-  generic must not silently strip defaults from everything beneath it. Don't
-  delete the mother object.
 
 ### Verbs are pure; the dispatcher is the only side-effecting place
 
