@@ -12,9 +12,9 @@ Last consolidated: 2026-07-25.
 
 ## ✓ RESOLVED
 
-~~ **C1 — Vigor/Rigor & skill totals** *(resolved 2026-07-25, Handler)*.
-They never appear in **weapon skill** totals; in weapon skills they instead drive **attack speed** — Vigor for melee (Blade, Brawl), Rigor for ranged/tech/chem (Barrel, Surge, Venom). They **do** legitimately appear in non-combat skill totals (Evade, Cover, Medic, Forge, Scrap, Hustle). Body reflects this.
-*(Supersedes the earlier "accuracy modifier" wording.)* ~~
+~~ **C1 — Vigor/Rigor & skill totals** *(resolved 2026-07-25, Handler)*. ~~
+~~ They never appear in **weapon skill** totals; in weapon skills they instead drive **attack speed** — Vigor for melee (Blade, Brawl), Rigor for ranged/tech/chem (Barrel, Surge, Venom). They **do** legitimately appear in non-combat skill totals (Evade, Cover, Medic, Forge, Scrap, Hustle). Body reflects this. ~~
+~~ *(Supersedes the earlier "accuracy modifier" wording.)* ~~
 
 ---
 
