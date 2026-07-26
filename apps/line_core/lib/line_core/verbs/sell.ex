@@ -67,8 +67,9 @@ defmodule LineCore.Verbs.Sell do
         {:error, :buyer_uninterested}
 
       true ->
-        base_value = Object.get_property(item.id, "scrap_value") ||
-                     Object.get_property(item.id, "value", 0)
+        base_value =
+          Object.get_property(item.id, "scrap_value") ||
+            Object.get_property(item.id, "value", 0)
 
         multiplier = Object.get_property(npc.id, "buy_multiplier", 1.0)
         # Defensive: multiplier may have arrived as Decimal or float
@@ -80,8 +81,7 @@ defmodule LineCore.Verbs.Sell do
          [
            {:move, item.id, npc.id, :contains},
            {:set_property, ctx.actor.id, "dirham", current_dirham + price},
-           {:notify_actor,
-            "You hand the #{item.name} to #{npc.name}. They pay you #{price} Dh."},
+           {:notify_actor, "You hand the #{item.name} to #{npc.name}. They pay you #{price} Dh."},
            {:notify_object, npc.id,
             "#{ctx.actor.name} sells you a #{item.name} for #{price} Dh."},
            {:notify_room, "#{ctx.actor.name} sells something to #{npc.name}.",

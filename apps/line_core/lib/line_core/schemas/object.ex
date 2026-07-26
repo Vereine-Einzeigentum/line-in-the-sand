@@ -22,28 +22,28 @@ defmodule LineCore.Schemas.Object do
   @foreign_key_type :binary_id
 
   schema "objects" do
-    field :type, Ecto.Enum, values: [:player, :room, :item, :npc, :exit]
-    field :name, :string
-    field :description, :string
+    field(:type, Ecto.Enum, values: [:player, :room, :item, :npc, :exit])
+    field(:name, :string)
+    field(:description, :string)
 
     # Verbs available on this object. Stored as a list of atoms identifying
     # registered verb handlers. The Object LM "knows" mechanical verbs; this
     # field declares which verbs this specific object responds to.
-    field :verbs, {:array, :string}, default: []
+    field(:verbs, {:array, :string}, default: [])
 
     # Soft-deletion. Deleted objects stay in the graph (for journal integrity)
     # but are filtered from queries.
-    field :deleted_at, :utc_datetime_usec
+    field(:deleted_at, :utc_datetime_usec)
 
     # EAV pattern for flexible properties. Hot properties (HP, location)
     # might get promoted to columns later if profiling demands it.
-    has_many :properties, Property, foreign_key: :object_id
+    has_many(:properties, Property, foreign_key: :object_id)
 
     # Outgoing edges (this object is the source).
-    has_many :outgoing_relationships, Relationship, foreign_key: :from_id
+    has_many(:outgoing_relationships, Relationship, foreign_key: :from_id)
 
     # Incoming edges (this object is the target).
-    has_many :incoming_relationships, Relationship, foreign_key: :to_id
+    has_many(:incoming_relationships, Relationship, foreign_key: :to_id)
 
     timestamps(type: :utc_datetime_usec)
   end

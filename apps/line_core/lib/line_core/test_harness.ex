@@ -136,7 +136,9 @@ defmodule LineCore.TestHarness do
         end
     after
       timeout ->
-        flunk("did not receive {:room_msg, _, _} matching #{inspect(pattern)} within #{timeout}ms")
+        flunk(
+          "did not receive {:room_msg, _, _} matching #{inspect(pattern)} within #{timeout}ms"
+        )
     end
   end
 

@@ -32,11 +32,11 @@ defmodule LineCore.Schemas.Relationship do
   @foreign_key_type :binary_id
 
   schema "object_relationships" do
-    belongs_to :from, Object, foreign_key: :from_id
-    belongs_to :to, Object, foreign_key: :to_id
+    belongs_to(:from, Object, foreign_key: :from_id)
+    belongs_to(:to, Object, foreign_key: :to_id)
 
-    field :type, Ecto.Enum, values: @relationship_types
-    field :metadata, :map, default: %{}
+    field(:type, Ecto.Enum, values: @relationship_types)
+    field(:metadata, :map, default: %{})
 
     timestamps(type: :utc_datetime_usec)
   end

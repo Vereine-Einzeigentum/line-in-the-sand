@@ -35,10 +35,11 @@ defmodule LineCore.Schemas.Property do
   @foreign_key_type :binary_id
 
   schema "object_properties" do
-    belongs_to :object, Object
+    belongs_to(:object, Object)
 
-    field :key, :string
-    field :value, :map  # JSONB column, but :map is Ecto's idiom for it
+    field(:key, :string)
+    # JSONB column, but :map is Ecto's idiom for it
+    field(:value, :map)
 
     timestamps(type: :utc_datetime_usec)
   end

@@ -21,7 +21,8 @@ defmodule LineWebWeb.PlaytestControllerRawTest do
     :ok
   end
 
-  defp auth(conn), do: Plug.Conn.put_req_header(conn, "authorization", "Bearer " <> @playtest_token)
+  defp auth(conn),
+    do: Plug.Conn.put_req_header(conn, "authorization", "Bearer " <> @playtest_token)
 
   test "POST /cmd with raw form dispatches via parser", %{conn: conn} do
     room = TestHarness.spawn_room("Hub", "A small room.")
