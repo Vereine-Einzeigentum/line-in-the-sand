@@ -10,6 +10,15 @@ defmodule LineCore.Parser do
 
   @directions ~w(n north s south e east w west u up d down ne northeast nw northwest se southeast sw southwest in out)
 
+  # Punctuation prefixes that stand in for a verb: `"hello` is `say hello`,
+  # `:waves` is `emote waves`. Ordered, and checked before the verb table,
+  # since these need no separating space. Exposed via `shorthands/0` so the
+  # help index can list them as the aliases they are.
+  @shorthands [
+    {"\"", Verbs.Say},
+    {":", Verbs.Emote}
+  ]
+
   @verb_map %{
     "look" => Verbs.Look,
     "l" => Verbs.Look,
@@ -79,13 +88,8 @@ defmodule LineCore.Parser do
       trimmed == "" ->
         {:empty, ""}
 
-      String.starts_with?(trimmed, "\"") ->
-        message = String.trim_leading(trimmed, "\"") |> String.trim()
-        {:ok, Verbs.Say, [message]}
-
-      String.starts_with?(trimmed, ":") ->
-        message = String.trim_leading(trimmed, ":") |> String.trim()
-        {:ok, Verbs.Emote, [message]}
+      shorthand = match_shorthand(trimmed) ->
+        shorthand
 
       String.downcase(trimmed) in @directions ->
         {:ok, Verbs.Go, [String.downcase(trimmed)]}
@@ -93,6 +97,14 @@ defmodule LineCore.Parser do
       true ->
         parse_verb(trimmed)
     end
+  end
+
+  defp match_shorthand(trimmed) do
+    Enum.find_value(@shorthands, fn {prefix, module} ->
+      if String.starts_with?(trimmed, prefix) do
+        {:ok, module, [trimmed |> String.trim_leading(prefix) |> String.trim()]}
+      end
+    end)
   end
 
   defp parse_verb(input) do
@@ -179,6 +191,14 @@ defmodule LineCore.Parser do
   end
 
   defp parse_args(_module, rest), do: [rest]
+
+  @doc """
+  Punctuation prefixes that stand in for a verb, as `{prefix, module}` pairs.
+
+  These never appear in `verb_map/0` because they are matched as prefixes
+  rather than whitespace-delimited words.
+  """
+  def shorthands, do: @shorthands
 
   def verb_map, do: @verb_map
   def known_verbs, do: @verb_map |> Map.values() |> Enum.uniq()

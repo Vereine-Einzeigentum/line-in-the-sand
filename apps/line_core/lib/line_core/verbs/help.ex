@@ -37,7 +37,7 @@ defmodule LineCore.Verbs.Help do
     Verbs.Examine => "Look closely at one thing.",
     Verbs.Go => "Walk. Bare directions work alone: n, s, e, w, u, d, in, out.",
     Verbs.Say => "Speak aloud to the room.",
-    Verbs.Emote => "Act rather than speak. `:` is shorthand.",
+    Verbs.Emote => "Act rather than speak.",
     Verbs.Text => "Message one person privately, wherever they are.",
     Verbs.Who => "See who else is awake in THE LINE.",
     Verbs.Inventory => "What you are carrying.",
@@ -123,14 +123,25 @@ defmodule LineCore.Verbs.Help do
     module |> Module.split() |> List.last() |> Macro.underscore()
   end
 
+  # Word aliases from the verb table, plus the punctuation shorthands the
+  # parser matches as prefixes (`"` for say, `:` for emote) — those never
+  # appear in verb_map/0, but to a player they are aliases like any other.
   defp aliases_for(module) do
     canonical = canonical_name(module)
 
-    Parser.verb_map()
-    |> Enum.filter(fn {_alias, mod} -> mod == module end)
-    |> Enum.map(fn {alias_name, _} -> alias_name end)
-    |> Enum.reject(&(&1 == canonical))
-    |> Enum.sort()
+    words =
+      Parser.verb_map()
+      |> Enum.filter(fn {_alias, mod} -> mod == module end)
+      |> Enum.map(fn {alias_name, _} -> alias_name end)
+      |> Enum.reject(&(&1 == canonical))
+      |> Enum.sort()
+
+    shorthands =
+      Parser.shorthands()
+      |> Enum.filter(fn {_prefix, mod} -> mod == module end)
+      |> Enum.map(fn {prefix, _} -> prefix end)
+
+    shorthands ++ words
   end
 
   defp summary(module), do: Map.get(@summaries, module, "No description yet.")

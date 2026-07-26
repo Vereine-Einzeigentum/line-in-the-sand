@@ -57,6 +57,24 @@ defmodule LineCore.HelpTest do
     test "closes with the pointer to per-command help" do
       assert index() =~ "Type `help <command>` for detail"
     end
+
+    test "punctuation shorthands are listed as aliases of their verb" do
+      text = index()
+
+      # `"hello` is say, `:waves` is emote — the parser matches these as
+      # prefixes, so they are absent from verb_map/0 but are still aliases.
+      assert text =~ ~r/say\s+.*\(also: "/
+      assert text =~ ~r/emote\s+.*\(also: :/
+    end
+
+    test "every parser shorthand reaches the index" do
+      text = index()
+
+      for {prefix, _module} <- Parser.shorthands() do
+        assert String.contains?(text, prefix),
+               "shorthand #{inspect(prefix)} is parsed but missing from the help index"
+      end
+    end
   end
 
   describe "help <command>" do
