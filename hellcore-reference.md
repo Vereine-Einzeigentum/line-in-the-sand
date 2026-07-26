@@ -6,18 +6,9 @@ on, and this project sits in that tradition. These are analysis notes with
 line citations into its `hellcore.db` — our own observations about how its
 systems are put together, not its source. Nothing here is a design commitment;
 where it informs one, that lives in the issue it informs.
-
-Two standing caveats, both load-bearing:
-
-- The db is a **pruned** fork. Its README says large amounts of Hell-specific
-  content were deleted. Absence in it is weak evidence of absence upstream.
-- Object *numbers* in that db are unreliable. The header declares 373 live
-  objects while code references numbers in the hundreds of thousands, because
-  LambdaMOO recycles ids. Several constants in live verbs now dereference to
-  entirely unrelated objects. Trust the parsed object table, not the constants.
 -->
 
-# HellCore combat/world subsystems — sourced specification
+# HellCore combat/world subsystems — Purely reference material
 
 Source files:
 - `HellCore/hellcore.db` (LambdaMOO db format v5, plain text, 766,470 lines).
@@ -27,15 +18,6 @@ Source files:
 - `hellmoo/pages/*.wiki` — the HellMOO wiki corpus, used only as corroborating
   *external* evidence about canonical/upstream HellMOO, never as a substitute
   for reading the db.
-
-**Global caveat inherited from the README**: this db is a pruned fork
-("deleted tons of Hell-specific objects and verbs"). The header declares
-`nobjects = 373` (line 2) — i.e. only 373 objects are actually alive in this
-snapshot, even though object numbers referenced throughout the code and data
-range into the hundreds of thousands (highest object id ever allocated is
-far larger than 373; the gap is prior objects that were created and later
-recycled/deleted). This single fact turns out to be central to sections 1 and
-2 below.
 
 ## Methodology note (important for trusting the line numbers)
 
