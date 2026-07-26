@@ -26,6 +26,10 @@ defmodule LineCore.MixProject do
     [
       {:ecto_sql, "~> 3.11"},
       {:postgrex, ">= 0.0.0"},
+      # Postgrex needs a JSON codec for the JSONB property/journal columns.
+      # It arrives transitively via line_web, but line_core must declare it to
+      # run standalone (e.g. `mix test` from inside apps/line_core).
+      {:jason, "~> 1.2"},
       {:phoenix_pubsub, "~> 2.1"},
       {:line_shared, in_umbrella: true}
     ]

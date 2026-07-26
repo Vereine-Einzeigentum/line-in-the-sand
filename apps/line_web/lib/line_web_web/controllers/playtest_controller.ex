@@ -52,7 +52,10 @@ defmodule LineWebWeb.PlaytestController do
           token: token,
           player_id: info.player_id,
           room_id: info.room_id,
-          created_at: info.created_at
+          created_at: info.created_at,
+          # Credential for the websocket; `player_id` above is only an
+          # identifier and is not accepted by UserSocket.
+          socket_token: LineWebWeb.PlayerToken.sign(info.player_id)
         })
 
       {:error, reason} ->

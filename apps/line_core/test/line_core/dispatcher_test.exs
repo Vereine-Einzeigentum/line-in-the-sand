@@ -20,11 +20,13 @@ defmodule LineCore.DispatcherTest do
   setup do
     Ecto.Adapters.SQL.Sandbox.checkout(Repo)
     Ecto.Adapters.SQL.Sandbox.mode(Repo, :auto)
+
     on_exit(fn ->
       Repo.delete_all(LineCore.Schemas.Property)
       Repo.delete_all(LineCore.Schemas.Relationship)
       Repo.delete_all(LineCore.Schemas.Object)
     end)
+
     :ok
   end
 

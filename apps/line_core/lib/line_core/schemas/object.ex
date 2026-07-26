@@ -16,15 +16,23 @@ defmodule LineCore.Schemas.Object do
   alias LineCore.Schemas.{Property, Relationship}
 
   @type id :: binary()
-  @type object_type :: :player | :room | :item | :npc | :exit
+  @type object_type :: :player | :room | :item | :npc | :exit | :generic
 
   @primary_key {:id, :binary_id, autogenerate: true}
   @foreign_key_type :binary_id
 
   schema "objects" do
-    field :type, Ecto.Enum, values: [:player, :room, :item, :npc, :exit]
+    # `:generic` marks a prototype — an object that exists to be inherited from
+    # rather than to be walked into or picked up. Generics live outside
+    # containment, so they never surface in room contents or inventories.
+    field :type, Ecto.Enum, values: [:player, :room, :item, :npc, :exit, :generic]
     field :name, :string
     field :description, :string
+
+    # Prototype inheritance. Properties and verbs resolve up this chain, with
+    # the nearest definition winning, so a generic supplies defaults that any
+    # descendant may shadow. See `LineCore.Object`.
+    belongs_to :parent, __MODULE__, foreign_key: :parent_id
 
     # Verbs available on this object. Stored as a list of atoms identifying
     # registered verb handlers. The Object LM "knows" mechanical verbs; this
@@ -49,12 +57,25 @@ defmodule LineCore.Schemas.Object do
   end
 
   @required_fields [:type, :name]
-  @optional_fields [:description, :verbs, :deleted_at]
+  @optional_fields [:description, :verbs, :deleted_at, :parent_id]
 
   def changeset(object, attrs) do
     object
     |> cast(attrs, @required_fields ++ @optional_fields)
     |> validate_required(@required_fields)
     |> validate_length(:name, min: 1, max: 120)
+    |> validate_not_self_parent()
+    |> foreign_key_constraint(:parent_id)
+  end
+
+  defp validate_not_self_parent(changeset) do
+    id = get_field(changeset, :id)
+    parent_id = get_field(changeset, :parent_id)
+
+    if not is_nil(id) and id == parent_id do
+      add_error(changeset, :parent_id, "an object cannot be its own parent")
+    else
+      changeset
+    end
   end
 end

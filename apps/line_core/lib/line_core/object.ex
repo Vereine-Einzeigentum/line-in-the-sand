@@ -31,20 +31,132 @@ defmodule LineCore.Object do
   end
 
   @doc "Fetch an object by id or raise."
-  def get!(id), do: get(id) || raise "object not found: #{id}"
+  def get!(id), do: get(id) || raise("object not found: #{id}")
+
+  ## Inheritance
+
+  # Prototype chains are expected to be shallow (a handful of links). The cap
+  # is a safety net against a cycle introduced outside `set_parent/2`, not a
+  # design limit.
+  @max_depth 16
+
+  @doc """
+  The object's prototype chain, nearest ancestor first, excluding the object.
+
+  Walks `parent_id` **without** filtering `deleted_at`: soft-deleting a generic
+  must not silently strip inherited properties from everything descended from
+  it. Stops at the first repeat, so a malformed cycle degrades to a finite
+  chain rather than hanging.
+  """
+  def ancestors(object_id) do
+    walk_ancestors(parent_id_of(object_id), MapSet.new([object_id]), [])
+  end
+
+  @doc "The object itself followed by its ancestors — the full lookup order."
+  def lineage(object_id), do: [object_id | ancestors(object_id)]
+
+  defp walk_ancestors(nil, _seen, acc), do: Enum.reverse(acc)
+
+  defp walk_ancestors(id, seen, acc) do
+    cond do
+      MapSet.member?(seen, id) -> Enum.reverse(acc)
+      length(acc) >= @max_depth -> Enum.reverse(acc)
+      true -> walk_ancestors(parent_id_of(id), MapSet.put(seen, id), [id | acc])
+    end
+  end
+
+  defp parent_id_of(object_id) do
+    from(o in Object, where: o.id == ^object_id, select: o.parent_id) |> Repo.one()
+  end
+
+  @doc """
+  Set (or clear, with `nil`) an object's prototype.
+
+  Refuses a parent that is the object itself or one of its own descendants,
+  which would orphan a cycle out of the lookup order.
+  """
+  def set_parent(object_id, nil) do
+    get!(object_id) |> Object.changeset(%{parent_id: nil}) |> Repo.update()
+  end
+
+  def set_parent(object_id, parent_id) do
+    cond do
+      object_id == parent_id ->
+        {:error, :self_parent}
+
+      object_id in lineage(parent_id) ->
+        {:error, :cycle}
+
+      true ->
+        get!(object_id) |> Object.changeset(%{parent_id: parent_id}) |> Repo.update()
+    end
+  end
+
+  @doc """
+  Create an object deriving from `generic_id`, inheriting its type.
+
+  The MOO idiom: you do not build a room from nothing, you derive one from the
+  generic room. Pass `type` in `attrs` to override.
+  """
+  def spawn_from(generic_id, name, attrs \\ %{}) do
+    case get(generic_id) do
+      nil ->
+        {:error, :generic_not_found}
+
+      generic ->
+        type = Map.get(attrs, :type, generic.type)
+
+        attrs
+        |> Map.merge(%{parent_id: generic_id, type: type})
+        |> then(&create(type, name, &1))
+    end
+  end
 
   ## Properties
 
-  @doc "Get a property value by key. Returns nil if not set."
+  @doc """
+  Get a property value by key, inheriting from the prototype chain.
+
+  The object's own value wins; failing that the nearest ancestor that defines
+  the key supplies it. Returns nil if no one in the chain defines it.
+  """
   def get_property(object_id, key) do
-    from(p in Property, where: p.object_id == ^object_id and p.key == ^key, select: p.value)
-    |> Repo.one()
-    |> case do
-      %{"v" => value} -> value
-      nil -> nil
-      other -> other
+    case own_property(object_id, key) do
+      nil -> inherited_property(object_id, key)
+      value -> value
     end
   end
+
+  @doc "Get a property defined directly on this object, ignoring inheritance."
+  def own_property(object_id, key) do
+    from(p in Property, where: p.object_id == ^object_id and p.key == ^key, select: p.value)
+    |> Repo.one()
+    |> unwrap_or_nil()
+  end
+
+  defp inherited_property(object_id, key) do
+    case ancestors(object_id) do
+      [] ->
+        nil
+
+      chain ->
+        found =
+          from(p in Property,
+            where: p.object_id in ^chain and p.key == ^key,
+            select: {p.object_id, p.value}
+          )
+          |> Repo.all()
+          |> Map.new()
+
+        chain
+        |> Enum.find_value(fn id -> Map.get(found, id) end)
+        |> unwrap_or_nil()
+    end
+  end
+
+  defp unwrap_or_nil(nil), do: nil
+  defp unwrap_or_nil(%{"v" => value}), do: value
+  defp unwrap_or_nil(other), do: other
 
   @doc "Get a property with a default if not set."
   def get_property(object_id, key, default) do
@@ -67,13 +179,53 @@ defmodule LineCore.Object do
     )
   end
 
-  @doc "Get all properties for an object as a map."
+  @doc """
+  All effective properties as a map, inherited values included.
+
+  Merged furthest ancestor first so nearer definitions shadow further ones and
+  the object's own values win outright.
+  """
   def properties(object_id) do
+    chain = lineage(object_id)
+
+    rows =
+      from(p in Property,
+        where: p.object_id in ^chain,
+        select: {p.object_id, p.key, p.value}
+      )
+      |> Repo.all()
+      |> Enum.group_by(fn {id, _, _} -> id end)
+
+    chain
+    |> Enum.reverse()
+    |> Enum.reduce(%{}, fn id, acc ->
+      rows
+      |> Map.get(id, [])
+      |> Enum.into(%{}, fn {_, k, v} -> {k, unwrap(v)} end)
+      |> then(&Map.merge(acc, &1))
+    end)
+  end
+
+  @doc "Properties defined directly on this object, ignoring inheritance."
+  def own_properties(object_id) do
     from(p in Property, where: p.object_id == ^object_id, select: {p.key, p.value})
     |> Repo.all()
-    |> Enum.into(%{}, fn {k, v} ->
-      {k, unwrap(v)}
-    end)
+    |> Enum.into(%{}, fn {k, v} -> {k, unwrap(v)} end)
+  end
+
+  @doc """
+  Verbs this object responds to, its prototype chain's included.
+
+  Union rather than shadowing: a generic grants capabilities to everything
+  descended from it, and a descendant adds its own.
+  """
+  def effective_verbs(object_id) do
+    chain = lineage(object_id)
+
+    from(o in Object, where: o.id in ^chain, select: o.verbs)
+    |> Repo.all()
+    |> List.flatten()
+    |> Enum.uniq()
   end
 
   defp unwrap(%{"v" => v}), do: v
