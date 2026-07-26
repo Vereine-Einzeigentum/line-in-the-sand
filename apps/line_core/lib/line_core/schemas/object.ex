@@ -57,7 +57,7 @@ defmodule LineCore.Schemas.Object do
   end
 
   @required_fields [:type, :name]
-  @optional_fields [:description, :verbs, :deleted_at, :parent_id]
+  @optional_fields [:id, :description, :verbs, :deleted_at, :parent_id]
 
   def changeset(object, attrs) do
     object

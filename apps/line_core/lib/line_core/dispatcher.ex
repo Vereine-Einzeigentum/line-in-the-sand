@@ -168,8 +168,14 @@ defmodule LineCore.Dispatcher do
   defp apply_event_to_multi(multi, {:delete_object, object_id}, _ctx) do
     import Ecto.Query
 
-    Multi.update_all(
-      multi,
+    multi
+    |> Multi.run({:check_delete, object_id, make_ref()}, fn _repo, _changes ->
+      case LineCore.Object.get(object_id) do
+        %{type: :player} -> {:error, :cannot_delete_player}
+        _ -> {:ok, :ok}
+      end
+    end)
+    |> Multi.update_all(
       {:delete_object, object_id, make_ref()},
       from(o in Object, where: o.id == ^object_id),
       set: [deleted_at: DateTime.utc_now()]

@@ -11,6 +11,7 @@ defmodule LineWebWeb.PlaytestControllerTest do
 
     # Set env var for the duration of the test
     System.put_env("PLAYTEST_TOKEN", @playtest_token)
+    LineCore.Seed.Generics.seed()
 
     on_exit(fn ->
       System.delete_env("PLAYTEST_TOKEN")

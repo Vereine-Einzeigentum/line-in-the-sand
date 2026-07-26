@@ -80,32 +80,26 @@ defmodule LineCore.PlaytestSession do
 
   @impl true
   def init({token, starting_room_id, name}) do
-    case Object.create(:player, name, %{}) do
-      {:ok, player} ->
-        case Object.relate(starting_room_id, player.id, :contains) do
-          {:ok, _} ->
-            PubSub.subscribe({:actor, player.id})
-            PubSub.subscribe({:room, starting_room_id})
+    # Genesis.player! creates the player and places it in the starting room
+    # atomically, deriving from the PC generic when available.
+    player = LineCore.Genesis.player!(name, place_in: starting_room_id)
 
-            state = %__MODULE__{
-              token: token,
-              player_id: player.id,
-              room_id: starting_room_id,
-              queue: :queue.new(),
-              created_at: DateTime.utc_now(),
-              last_activity: DateTime.utc_now()
-            }
+    PubSub.subscribe({:actor, player.id})
+    PubSub.subscribe({:room, starting_room_id})
 
-            {:ok, state, @idle_timeout}
+    state = %__MODULE__{
+      token: token,
+      player_id: player.id,
+      room_id: starting_room_id,
+      queue: :queue.new(),
+      created_at: DateTime.utc_now(),
+      last_activity: DateTime.utc_now()
+    }
 
-          error ->
-            Object.unrelate(starting_room_id, player.id, :contains)
-            {:stop, {:relate_failed, error}}
-        end
-
-      error ->
-        {:stop, {:player_create_failed, error}}
-    end
+    {:ok, state, @idle_timeout}
+  rescue
+    err ->
+      {:stop, {:player_create_failed, Exception.message(err)}}
   end
 
   @impl true
@@ -200,14 +194,9 @@ defmodule LineCore.PlaytestSession do
     PubSub.unsubscribe({:actor, state.player_id})
     PubSub.unsubscribe({:room, state.room_id})
 
-    case Object.get(state.player_id) do
-      nil ->
-        :ok
-
-      player ->
-        LineCore.Repo.update!(
-          LineCore.Schemas.Object.changeset(player, %{deleted_at: DateTime.utc_now()})
-        )
-    end
+    # The player body persists in the world — only connection-scoped resources
+    # are torn down here. Mark the player offline so look output can show them
+    # as idle/asleep.
+    Object.set_property(state.player_id, "active_state", "offline")
   end
 end

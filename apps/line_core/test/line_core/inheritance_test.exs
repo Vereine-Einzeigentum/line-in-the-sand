@@ -172,16 +172,20 @@ defmodule LineCore.InheritanceTest do
       second = Generics.seed()
 
       assert first.mother.id == second.mother.id
-      assert first.player.id == second.player.id
+      assert first.pc.id == second.pc.id
 
-      # Generic Player derives from Generic Being derives from the mother.
-      assert Object.ancestors(first.player.id) == [first.being.id, first.mother.id]
+      # PC derives from Human derives from Mob derives from the mother.
+      assert Object.ancestors(first.pc.id) == [
+               first.human.id,
+               first.mob.id,
+               first.mother.id
+             ]
     end
 
     test "a spawned player inherits combat defaults and verbs" do
       g = Generics.seed()
 
-      {:ok, player} = Object.spawn_from(g.player.id, "Tester", %{type: :player})
+      {:ok, player} = Object.spawn_from(g.pc.id, "Tester", %{type: :player})
 
       assert Object.get_property(player.id, "hp_max") == 20
       assert Object.get_property(player.id, "dirham") == 0
@@ -192,11 +196,26 @@ defmodule LineCore.InheritanceTest do
       assert "look" in verbs
     end
 
+    test "leaf generics declare instance_type; abstract generics do not" do
+      g = Generics.seed()
+
+      assert Object.get_property(g.pc.id, "instance_type") == "player"
+      assert Object.get_property(g.npc.id, "instance_type") == "npc"
+      assert Object.get_property(g.room.id, "instance_type") == "room"
+      assert Object.get_property(g.weapon.id, "instance_type") == "item"
+      assert Object.get_property(g.scrap.id, "instance_type") == "item"
+
+      # Abstract intermediates have no instance_type
+      assert Object.get_property(g.mob.id, "instance_type") == nil
+      assert Object.get_property(g.human.id, "instance_type") == nil
+      assert Object.get_property(g.thing.id, "instance_type") == nil
+    end
+
     test "generics stay out of containment and so never render in a room" do
       g = Generics.seed()
 
       assert Object.container_of(g.mother.id) == nil
-      assert Object.container_of(g.player.id) == nil
+      assert Object.container_of(g.pc.id) == nil
     end
   end
 end
