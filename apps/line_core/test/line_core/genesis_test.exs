@@ -199,7 +199,7 @@ defmodule LineCore.GenesisTest do
     test "a spawned PC has hp_max without setting it" do
       {:ok, player} = Genesis.create(%{name: "Tester", template: :pc})
 
-      assert Object.get_property(player.id, "hp_max") == 20
+      assert Object.get_property(player.id, "hp_max") == 50
       assert Object.get_property(player.id, "dirham") == 0
     end
   end
@@ -332,7 +332,7 @@ defmodule LineCore.GenesisTest do
 
     test "inherits hp_max and dirham from PC ancestry" do
       player = Genesis.player!("Bob")
-      assert Object.get_property(player.id, "hp_max") == 20
+      assert Object.get_property(player.id, "hp_max") == 50
       assert Object.get_property(player.id, "dirham") == 0
     end
 

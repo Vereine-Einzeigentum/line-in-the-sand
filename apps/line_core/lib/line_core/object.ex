@@ -253,16 +253,78 @@ defmodule LineCore.Object do
     |> Repo.delete_all()
   end
 
-  @doc "Move an object from its current container to a new one. Atomic."
-  def move(object_id, new_container_id, type \\ :contains) do
-    Repo.transaction(fn ->
-      from(r in Relationship,
-        where: r.to_id == ^object_id and r.type == ^type
-      )
-      |> Repo.delete_all()
+  @doc """
+  Move an object from its current container to a new one. Atomic.
 
-      relate(new_container_id, object_id, type)
-    end)
+  Refuses a move that would put an object inside itself, directly or through
+  any depth of nesting — on the ordinary path. Drive a vehicle into its own
+  trailer by accident and you get `{:error, :containment_cycle}`.
+
+  Pass `force: true` to permit it anyway. Two things need that door. A
+  container inside itself is impossible geometry, and impossible geometry is
+  something the building can do even though a player cannot walk into it. More
+  prosaically, it is how anything gets unstuck: teleporting a player or an
+  object out of somewhere the ordinary movement rules will not let it leave.
+
+  Every containment walk in this module is capped and cycle-tolerant precisely
+  so a deliberate cycle is survivable rather than fatal.
+  """
+  def move(object_id, new_container_id, type \\ :contains, opts \\ []) do
+    if not Keyword.get(opts, :force, false) and
+         would_cycle?(object_id, new_container_id, type) do
+      {:error, :containment_cycle}
+    else
+      Repo.transaction(fn ->
+        from(r in Relationship,
+          where: r.to_id == ^object_id and r.type == ^type
+        )
+        |> Repo.delete_all()
+
+        relate(new_container_id, object_id, type)
+      end)
+    end
+  end
+
+  @doc """
+  Would placing `object_id` inside `container_id` create a containment cycle?
+
+  True when they are the same object, or when the proposed container is
+  somewhere inside the object already.
+  """
+  def would_cycle?(object_id, container_id, type \\ :contains)
+  def would_cycle?(id, id, _type), do: true
+
+  def would_cycle?(object_id, container_id, type) do
+    object_id in container_chain(container_id, type)
+  end
+
+  @doc """
+  The containers enclosing an object, innermost first, excluding the object.
+
+  Capped and cycle-tolerant in the same spirit as `ancestors/1`: bad data
+  already in the graph degrades to a finite list instead of hanging.
+  """
+  def container_chain(object_id, type \\ :contains) do
+    walk_containers(container_id_of(object_id, type), MapSet.new([object_id]), [])
+  end
+
+  defp walk_containers(nil, _seen, acc), do: Enum.reverse(acc)
+
+  defp walk_containers(id, seen, acc) do
+    cond do
+      MapSet.member?(seen, id) -> Enum.reverse(acc)
+      length(acc) >= @max_depth -> Enum.reverse(acc)
+      true -> walk_containers(container_id_of(id, :contains), MapSet.put(seen, id), [id | acc])
+    end
+  end
+
+  defp container_id_of(object_id, type) do
+    from(r in Relationship,
+      where: r.to_id == ^object_id and r.type == ^type,
+      select: r.from_id,
+      limit: 1
+    )
+    |> Repo.one()
   end
 
   ## Containment queries

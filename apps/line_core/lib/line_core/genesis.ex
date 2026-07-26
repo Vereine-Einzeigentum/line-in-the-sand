@@ -59,7 +59,7 @@ defmodule LineCore.Genesis do
 
   alias Ecto.Multi
   alias LineCore.Repo
-  alias LineCore.Schemas.{Object, Property, Relationship}
+  alias LineCore.Schemas.Object
 
   @type id :: binary()
   @type generic_ref :: atom() | id() | struct()
@@ -331,44 +331,16 @@ defmodule LineCore.Genesis do
   defp fetch_type(%{type: type}) when not is_nil(type), do: {:ok, type}
   defp fetch_type(_), do: {:error, :type_required}
 
+  # Applied through the dispatcher's own appliers rather than a second copy of
+  # them. Genesis emits ordinary events, so it should get the ordinary rules —
+  # including the refusals that live there.
   defp apply_events(events) do
-    multi =
-      Enum.reduce(events, Multi.new(), fn event, acc ->
-        add_to_multi(acc, event)
-      end)
+    multi = LineCore.Dispatcher.apply_to_multi(Multi.new(), events)
 
     case Repo.transaction(multi) do
       {:ok, _} -> {:ok, :applied}
       {:error, _key, reason, _changes} -> {:error, reason}
     end
-  end
-
-  defp add_to_multi(multi, {:create_object, attrs}) do
-    Multi.insert(
-      multi,
-      {:create_object, make_ref()},
-      Object.changeset(%Object{}, attrs)
-    )
-  end
-
-  defp add_to_multi(multi, {:set_property, object_id, key, value}) do
-    stored = if is_map(value), do: value, else: %{"v" => value}
-
-    Multi.insert(
-      multi,
-      {:set_property, object_id, key, make_ref()},
-      Property.changeset(%Property{}, %{object_id: object_id, key: key, value: stored}),
-      on_conflict: [set: [value: stored, updated_at: DateTime.utc_now()]],
-      conflict_target: [:object_id, :key]
-    )
-  end
-
-  defp add_to_multi(multi, {:relate, from_id, to_id, rel_type}) do
-    Multi.insert(
-      multi,
-      {:relate, from_id, to_id, rel_type, make_ref()},
-      Relationship.changeset(%Relationship{}, %{from_id: from_id, to_id: to_id, type: rel_type})
-    )
   end
 
   defp maybe_put(map, _key, nil), do: map

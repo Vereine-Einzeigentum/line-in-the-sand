@@ -135,7 +135,7 @@ defmodule LineCore.VerbsTest do
   describe "Examine" do
     test "shows the target's full description" do
       room = TestHarness.spawn_room("Hub")
-      TestHarness.spawn_item_in(room, "rusty knife", %{description: "Chipped at the edge."})
+      TestHarness.spawn_item_in(room, "rusty knife", description: "Chipped at the edge.")
       player = TestHarness.spawn_player_in(room)
 
       TestHarness.dispatch(player, Examine, ["knife"])

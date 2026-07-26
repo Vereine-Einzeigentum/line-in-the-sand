@@ -98,6 +98,23 @@ defmodule LineCore.Dispatcher do
     |> Repo.transaction()
   end
 
+  @doc """
+  Fold persistent events into `multi`, ignoring notification events.
+
+  Public so callers outside the verb pipeline — `LineCore.Genesis` most of all
+  — materialise event lists through *these* appliers rather than keeping a
+  second copy. Keeping one implementation is the point: the rules for what
+  `{:move, ...}` or `{:delete_object, ...}` mean to the database, including
+  the cycle and player-deletion refusals, live here and nowhere else. A second
+  applier is a second set of rules, and it will drift.
+
+  No `Context` is involved because no persistent event consults one; only
+  broadcasting does, and that is not this function's job.
+  """
+  def apply_to_multi(multi, events) do
+    Enum.reduce(events, multi, fn event, acc -> apply_event_to_multi(acc, event, nil) end)
+  end
+
   defp apply_event_to_multi(multi, {:set_property, object_id, key, value}, _ctx) do
     stored = if is_map(value), do: value, else: %{"v" => value}
 
@@ -121,7 +138,29 @@ defmodule LineCore.Dispatcher do
     )
   end
 
-  defp apply_event_to_multi(multi, {:move, object_id, to_container_id, rel_type}, _ctx) do
+  # An object cannot be moved inside itself, at any depth — not by walking.
+  # The guard lives here as well as in `Object.move/4` for the same reason the
+  # player-delete refusal does: this is where events become writes, so a verb
+  # emitting a bad `:move` cannot route around it.
+  #
+  # `:force_move` is the same write without the check. A container inside
+  # itself is impossible geometry and the building is allowed impossible
+  # geometry; players are not. Keeping it a separate event rather than a flag
+  # means the journal records *which* it was, so admin geometry is legible in
+  # the audit trail instead of looking like an ordinary move.
+  defp apply_event_to_multi(multi, {:move, object_id, to_container_id, rel_type}, ctx) do
+    multi
+    |> Multi.run({:check_move, object_id, make_ref()}, fn _repo, _changes ->
+      if LineCore.Object.would_cycle?(object_id, to_container_id, rel_type) do
+        {:error, :containment_cycle}
+      else
+        {:ok, :permitted}
+      end
+    end)
+    |> apply_event_to_multi({:force_move, object_id, to_container_id, rel_type}, ctx)
+  end
+
+  defp apply_event_to_multi(multi, {:force_move, object_id, to_container_id, rel_type}, _ctx) do
     import Ecto.Query
 
     multi
