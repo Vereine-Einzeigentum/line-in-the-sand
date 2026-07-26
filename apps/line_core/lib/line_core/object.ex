@@ -260,11 +260,14 @@ defmodule LineCore.Object do
   any depth of nesting — on the ordinary path. Drive a vehicle into its own
   trailer by accident and you get `{:error, :containment_cycle}`.
 
-  Pass `force: true` to permit it anyway. A container inside itself is
-  impossible geometry, and impossible geometry is a thing the building can do;
-  it is simply not a thing a player can do by walking. Every containment walk
-  in this module is capped and cycle-tolerant precisely so that a deliberate
-  cycle is survivable rather than fatal.
+  Pass `force: true` to permit it anyway. Two things need that door. A
+  container inside itself is impossible geometry, and impossible geometry is
+  something the building can do even though a player cannot walk into it. More
+  prosaically, it is how anything gets unstuck: teleporting a player or an
+  object out of somewhere the ordinary movement rules will not let it leave.
+
+  Every containment walk in this module is capped and cycle-tolerant precisely
+  so a deliberate cycle is survivable rather than fatal.
   """
   def move(object_id, new_container_id, type \\ :contains, opts \\ []) do
     if not Keyword.get(opts, :force, false) and
