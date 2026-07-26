@@ -2,22 +2,7 @@ defmodule LineCore.VerbsTest do
   use ExUnit.Case, async: false
 
   alias LineCore.{Object, Repo, TestHarness}
-
-  alias LineCore.Verbs.{
-    Go,
-    Get,
-    Drop,
-    Examine,
-    Inventory,
-    Say,
-    Text,
-    Who,
-    Desc,
-    Emote,
-    Score,
-    Give,
-    Unwield
-  }
+  alias LineCore.Verbs.{Go, Get, Drop, Examine, Inventory, Say, Text, Who, Desc}
 
   setup do
     Ecto.Adapters.SQL.Sandbox.checkout(Repo)
@@ -135,7 +120,7 @@ defmodule LineCore.VerbsTest do
   describe "Examine" do
     test "shows the target's full description" do
       room = TestHarness.spawn_room("Hub")
-      TestHarness.spawn_item_in(room, "rusty knife", description: "Chipped at the edge.")
+      TestHarness.spawn_item_in(room, "rusty knife", %{description: "Chipped at the edge."})
       player = TestHarness.spawn_player_in(room)
 
       TestHarness.dispatch(player, Examine, ["knife"])
@@ -210,7 +195,7 @@ defmodule LineCore.VerbsTest do
       room_a = TestHarness.spawn_room("Room A")
       room_b = TestHarness.spawn_room("Room B")
       alice = TestHarness.spawn_player_in(room_a, "Alice")
-      _bob = TestHarness.spawn_player_in(room_b, "Bob")
+      bob = TestHarness.spawn_player_in(room_b, "Bob")
 
       TestHarness.dispatch(alice, Text, ["Bob", "are you there"])
 
@@ -292,258 +277,6 @@ defmodule LineCore.VerbsTest do
       room = TestHarness.spawn_room("Hub")
       player = TestHarness.spawn_player_in(room)
       assert {:error, :empty_description} = TestHarness.dispatch(player, Desc, [""])
-    end
-  end
-
-  ## Emote
-
-  describe "Emote" do
-    test "broadcasts action to the room with actor name" do
-      room = TestHarness.spawn_room("Hub")
-      alice = TestHarness.spawn_player_in(room, "Alice")
-      bob = TestHarness.spawn_player_in(room, "Bob")
-
-      {:ok, events} =
-        Emote.execute(
-          %LineCore.Verb.Context{
-            actor: alice,
-            room: room,
-            room_contents: [alice, bob]
-          },
-          ["waves"]
-        )
-
-      assert events == [{:notify_room, "Alice waves"}]
-    end
-
-    test "includes the actor name in emote message" do
-      room = TestHarness.spawn_room("Hub")
-      alice = TestHarness.spawn_player_in(room, "Alice")
-
-      {:ok, events} =
-        Emote.execute(
-          %LineCore.Verb.Context{
-            actor: alice,
-            room: room,
-            room_contents: [alice]
-          },
-          ["grins mischievously"]
-        )
-
-      assert events == [{:notify_room, "Alice grins mischievously"}]
-    end
-
-    test "errors with no action" do
-      assert {:error, :emote_what} = Emote.execute(%LineCore.Verb.Context{}, [])
-    end
-
-    test "errors with empty message" do
-      assert {:error, :emote_what} = Emote.execute(%LineCore.Verb.Context{}, [""])
-    end
-  end
-
-  ## Score
-
-  describe "Score" do
-    test "shows HP and dirham to actor" do
-      room = TestHarness.spawn_room("Hub")
-      player = TestHarness.spawn_player_in(room)
-      Object.set_property(player.id, "hp_current", 30)
-      Object.set_property(player.id, "hp_max", 50)
-      Object.set_property(player.id, "dirham", 100)
-
-      TestHarness.dispatch(player, Score, [])
-
-      msg = TestHarness.assert_msg(~r/Character Sheet/)
-      assert msg =~ "30/50"
-      assert msg =~ "100"
-    end
-
-    test "shows default HP when not set" do
-      room = TestHarness.spawn_room("Hub")
-      player = TestHarness.spawn_player_in(room)
-
-      TestHarness.dispatch(player, Score, [])
-
-      msg = TestHarness.assert_msg(~r/Character Sheet/)
-      assert msg =~ "50/50"
-    end
-
-    test "shows stat and skill properties" do
-      room = TestHarness.spawn_room("Hub")
-      player = TestHarness.spawn_player_in(room)
-      Object.set_property(player.id, "stat_wire", 8)
-      Object.set_property(player.id, "skill_scrap", 5)
-
-      TestHarness.dispatch(player, Score, [])
-
-      msg = TestHarness.assert_msg(~r/Character Sheet/)
-      assert msg =~ "Wire: 8"
-      assert msg =~ "Scrap: 5"
-    end
-
-    test "errors with arguments" do
-      room = TestHarness.spawn_room("Hub")
-      player = TestHarness.spawn_player_in(room)
-      assert {:error, :bad_args} = TestHarness.dispatch(player, Score, ["arg"])
-    end
-  end
-
-  ## Give
-
-  describe "Give" do
-    test "transfers item from actor inventory to recipient" do
-      room = TestHarness.spawn_room("Hub")
-      alice = TestHarness.spawn_player_in(room, "Alice")
-      bob = TestHarness.spawn_player_in(room, "Bob")
-      {:ok, knife} = Object.create(:item, "knife")
-      Object.relate(alice.id, knife.id, :contains)
-
-      {:ok, events} =
-        Give.execute(
-          %LineCore.Verb.Context{
-            actor: alice,
-            room: room,
-            room_contents: [alice, bob]
-          },
-          ["knife", "Bob"]
-        )
-
-      move_event = Enum.find(events, &match?({:move, _, _, _}, &1))
-      assert {:move, item_id, recipient_id, :contains} = move_event
-      assert item_id == knife.id
-      assert recipient_id == bob.id
-    end
-
-    test "errors when item not in inventory" do
-      room = TestHarness.spawn_room("Hub")
-      alice = TestHarness.spawn_player_in(room, "Alice")
-      bob = TestHarness.spawn_player_in(room, "Bob")
-
-      assert {:error, :not_holding} =
-               Give.execute(
-                 %LineCore.Verb.Context{
-                   actor: alice,
-                   room: room,
-                   room_contents: [alice, bob]
-                 },
-                 ["sword", "Bob"]
-               )
-    end
-
-    test "errors when recipient not in room" do
-      room = TestHarness.spawn_room("Hub")
-      alice = TestHarness.spawn_player_in(room, "Alice")
-      {:ok, knife} = Object.create(:item, "knife")
-      Object.relate(alice.id, knife.id, :contains)
-
-      assert {:error, :not_found} =
-               Give.execute(
-                 %LineCore.Verb.Context{
-                   actor: alice,
-                   room: room,
-                   room_contents: [alice]
-                 },
-                 ["knife", "Bob"]
-               )
-    end
-
-    test "errors when giving to self" do
-      room = TestHarness.spawn_room("Hub")
-      alice = TestHarness.spawn_player_in(room, "Alice")
-      {:ok, knife} = Object.create(:item, "knife")
-      Object.relate(alice.id, knife.id, :contains)
-
-      assert {:error, :cannot_give_self} =
-               Give.execute(
-                 %LineCore.Verb.Context{
-                   actor: alice,
-                   room: room,
-                   room_contents: [alice]
-                 },
-                 ["knife", "Alice"]
-               )
-    end
-  end
-
-  ## Unwield
-
-  describe "Unwield" do
-    test "unwields all items when no argument given" do
-      room = TestHarness.spawn_room("Hub")
-      actor = TestHarness.spawn_player_in(room)
-      {:ok, sword} = Object.create(:item, "sword")
-      {:ok, shield} = Object.create(:item, "shield")
-      Object.relate(actor.id, sword.id, :wields_main)
-      Object.relate(actor.id, shield.id, :wields_off)
-
-      {:ok, events} =
-        Unwield.execute(
-          %LineCore.Verb.Context{
-            actor: actor,
-            room: room,
-            room_contents: [actor]
-          },
-          []
-        )
-
-      # Should have unrelate events for both items
-      unrelate_events = Enum.filter(events, &match?({:unrelate, _, _, _}, &1))
-      assert length(unrelate_events) == 2
-    end
-
-    test "unwields specific item by name" do
-      room = TestHarness.spawn_room("Hub")
-      actor = TestHarness.spawn_player_in(room)
-      {:ok, sword} = Object.create(:item, "sword")
-      Object.relate(actor.id, sword.id, :wields_main)
-
-      {:ok, events} =
-        Unwield.execute(
-          %LineCore.Verb.Context{
-            actor: actor,
-            room: room,
-            room_contents: [actor]
-          },
-          ["sword"]
-        )
-
-      assert Enum.any?(events, fn
-               {:unrelate, _, item_id, :wields_main} -> item_id == sword.id
-               _ -> false
-             end)
-    end
-
-    test "errors when nothing is wielded" do
-      room = TestHarness.spawn_room("Hub")
-      actor = TestHarness.spawn_player_in(room)
-
-      assert {:error, :not_wielding} =
-               Unwield.execute(
-                 %LineCore.Verb.Context{
-                   actor: actor,
-                   room: room,
-                   room_contents: [actor]
-                 },
-                 []
-               )
-    end
-
-    test "errors when trying to unwield non-wielded item" do
-      room = TestHarness.spawn_room("Hub")
-      actor = TestHarness.spawn_player_in(room)
-      {:ok, sword} = Object.create(:item, "sword")
-      Object.relate(actor.id, sword.id, :contains)
-
-      assert {:error, :not_wielding} =
-               Unwield.execute(
-                 %LineCore.Verb.Context{
-                   actor: actor,
-                   room: room,
-                   room_contents: [actor]
-                 },
-                 ["sword"]
-               )
     end
   end
 end

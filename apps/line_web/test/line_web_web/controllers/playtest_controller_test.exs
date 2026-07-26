@@ -1,7 +1,7 @@
 defmodule LineWebWeb.PlaytestControllerTest do
   use LineWebWeb.ConnCase, async: false
 
-  alias LineCore.{Repo, TestHarness}
+  alias LineCore.{Object, Repo, TestHarness}
 
   @playtest_token "test-token-do-not-use-in-prod"
 
@@ -11,7 +11,6 @@ defmodule LineWebWeb.PlaytestControllerTest do
 
     # Set env var for the duration of the test
     System.put_env("PLAYTEST_TOKEN", @playtest_token)
-    LineCore.Seed.Generics.seed()
 
     on_exit(fn ->
       System.delete_env("PLAYTEST_TOKEN")

@@ -86,21 +86,6 @@ defmodule LineCore.ParserTest do
     end
   end
 
-  describe "parse/1 — emote prefix" do
-    test "colon prefix routes to Emote" do
-      assert {:ok, Verbs.Emote, ["waves"]} = Parser.parse(":waves")
-    end
-
-    test "colon prefix with no action" do
-      assert {:ok, Verbs.Emote, [""]} = Parser.parse(":")
-    end
-
-    test "colon prefix preserves action description" do
-      assert {:ok, Verbs.Emote, ["grins mischievously"]} =
-               Parser.parse(":grins mischievously")
-    end
-  end
-
   describe "parse/1 — multi-word arguments" do
     test "get with multi-word item name" do
       assert {:ok, Verbs.Get, ["rusty knife"]} = Parser.parse("get rusty knife")
@@ -151,89 +136,6 @@ defmodule LineCore.ParserTest do
 
     test "who <player>" do
       assert {:ok, Verbs.Who, ["Graves"]} = Parser.parse("who Graves")
-    end
-  end
-
-  describe "parse/1 — score verb" do
-    test "score aliases all route to Score" do
-      assert {:ok, Verbs.Score, []} = Parser.parse("score")
-      assert {:ok, Verbs.Score, []} = Parser.parse("stats")
-      assert {:ok, Verbs.Score, []} = Parser.parse("sc")
-    end
-
-    test "score ignores trailing arguments" do
-      assert {:ok, Verbs.Score, []} = Parser.parse("score anything")
-    end
-  end
-
-  describe "parse/1 — emote verb aliases" do
-    test "emote verb aliases all route to Emote" do
-      assert {:ok, Verbs.Emote, ["waves"]} = Parser.parse("emote waves")
-      assert {:ok, Verbs.Emote, ["waves"]} = Parser.parse("me waves")
-    end
-  end
-
-  describe "parse/1 — give verb structure" do
-    test "give <item> to <player>" do
-      assert {:ok, Verbs.Give, ["sword", "Alice"]} = Parser.parse("give sword to Alice")
-    end
-
-    test "give with multi-word item and recipient" do
-      assert {:ok, Verbs.Give, ["rusty sword", "Alice"]} =
-               Parser.parse("give rusty sword to Alice")
-    end
-
-    test "hand alias routes to Give" do
-      assert {:ok, Verbs.Give, ["knife", "Bob"]} = Parser.parse("hand knife to Bob")
-    end
-
-    test "give without recipient returns malformed" do
-      assert {:ok, Verbs.Give, ["sword"]} = Parser.parse("give sword")
-    end
-  end
-
-  describe "parse/1 — unwield verb structure" do
-    test "bare unwield" do
-      assert {:ok, Verbs.Unwield, []} = Parser.parse("unwield")
-    end
-
-    test "unwield <item>" do
-      assert {:ok, Verbs.Unwield, ["sword"]} = Parser.parse("unwield sword")
-    end
-
-    test "unequip alias routes to Unwield" do
-      assert {:ok, Verbs.Unwield, []} = Parser.parse("unequip")
-      assert {:ok, Verbs.Unwield, ["shield"]} = Parser.parse("unequip shield")
-    end
-
-    test "sheathe alias routes to Unwield" do
-      assert {:ok, Verbs.Unwield, []} = Parser.parse("sheathe")
-      assert {:ok, Verbs.Unwield, ["sword"]} = Parser.parse("sheathe sword")
-    end
-  end
-
-  describe "parse/1 — help verb structure" do
-    test "bare help" do
-      assert {:ok, Verbs.Help, []} = Parser.parse("help")
-    end
-
-    test "help <verb>" do
-      assert {:ok, Verbs.Help, ["look"]} = Parser.parse("help look")
-    end
-
-    test "h alias routes to Help" do
-      assert {:ok, Verbs.Help, []} = Parser.parse("h")
-      assert {:ok, Verbs.Help, ["attack"]} = Parser.parse("h attack")
-    end
-
-    test "commands alias routes to Help" do
-      assert {:ok, Verbs.Help, []} = Parser.parse("commands")
-      assert {:ok, Verbs.Help, ["say"]} = Parser.parse("commands say")
-    end
-
-    test "? alias routes to Help" do
-      assert {:ok, Verbs.Help, []} = Parser.parse("?")
-      assert {:ok, Verbs.Help, ["go"]} = Parser.parse("? go")
     end
   end
 

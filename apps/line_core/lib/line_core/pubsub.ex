@@ -26,10 +26,7 @@ defmodule LineCore.PubSub do
   def subscribe({:channel, name}), do: Phoenix.PubSub.subscribe(@pubsub, "channel:#{name}")
 
   def unsubscribe({:room, room_id}), do: Phoenix.PubSub.unsubscribe(@pubsub, "room:#{room_id}")
-
-  def unsubscribe({:actor, actor_id}),
-    do: Phoenix.PubSub.unsubscribe(@pubsub, "actor:#{actor_id}")
-
+  def unsubscribe({:actor, actor_id}), do: Phoenix.PubSub.unsubscribe(@pubsub, "actor:#{actor_id}")
   def unsubscribe({:channel, name}), do: Phoenix.PubSub.unsubscribe(@pubsub, "channel:#{name}")
 
   def broadcast({:room, room_id}, msg) do

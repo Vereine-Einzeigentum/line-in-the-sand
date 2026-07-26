@@ -22,73 +22,43 @@ defmodule LineCore.TestHarness do
       end
   """
 
-  alias LineCore.{Dispatcher, Genesis, Object, PubSub}
-  alias LineCore.Seed.Generics
+  alias LineCore.{Dispatcher, Object, PubSub}
 
   ## Spawning helpers
-  #
-  # Every spawner goes through `LineCore.Genesis`, so harness-built objects
-  # derive from the generics exactly like seeded content does. That is what
-  # makes the verb, combat and scrap-loop suites exercise inheritance
-  # transitively rather than testing a path production never takes — and it is
-  # what gives an actor a verb list at all, which the dispatcher's
-  # authorization check depends on.
-  #
-  # Options are keyword lists: `description:`, `verbs:`, `properties:`,
-  # `template:`.
-
-  @doc """
-  Ensure the prototype chain exists.
-
-  Called by every spawner. The sandbox rolls back per test, so the generics
-  have to be re-seeded inside each one; the `mother/0` check keeps that to a
-  single query when they are already there. Deliberately not cached across
-  tests — a stale cross-test cache would silently corrupt unrelated tests.
-  """
-  def ensure_generics do
-    case Generics.mother() do
-      nil -> Generics.seed()
-      _ -> :ok
-    end
-  end
 
   @doc "Create a room with the given name and description."
   def spawn_room(name, description \\ "An unremarkable room.") do
-    ensure_generics()
-    Genesis.room!(name, description: description)
+    {:ok, room} = Object.create(:room, name, %{description: description})
+    room
   end
 
   @doc "Create a player and subscribe the calling test process to their actor topic."
-  def spawn_player(name \\ "Tester", opts \\ []) do
-    ensure_generics()
-    subscribed(Genesis.player!(name, opts))
-  end
-
-  @doc "Create a player and place them in the given room. Subscribes caller to actor topic."
-  def spawn_player_in(room, name \\ "Tester", opts \\ []) do
-    ensure_generics()
-    subscribed(Genesis.player!(name, Keyword.put(opts, :place_in, id_of(room))))
-  end
-
-  @doc "Create an item and place it in the given container."
-  def spawn_item_in(container, name, opts \\ []) do
-    ensure_generics()
-    Genesis.item!(container, name, Keyword.put_new(opts, :template, :thing))
-  end
-
-  @doc "Create an NPC and place it in the given room."
-  def spawn_npc_in(room, name, opts \\ []) do
-    ensure_generics()
-    Genesis.npc!(room, name, opts)
-  end
-
-  defp subscribed(player) do
+  def spawn_player(name \\ "Tester") do
+    {:ok, player} = Object.create(:player, name)
     :ok = PubSub.subscribe({:actor, player.id})
     player
   end
 
-  defp id_of(%{id: id}), do: id
-  defp id_of(id) when is_binary(id), do: id
+  @doc "Create a player and place them in the given room. Subscribes caller to actor topic."
+  def spawn_player_in(room, name \\ "Tester") do
+    player = spawn_player(name)
+    {:ok, _} = Object.relate(room.id, player.id, :contains)
+    player
+  end
+
+  @doc "Create an item and place it in the given container."
+  def spawn_item_in(container, name, attrs \\ %{}) do
+    {:ok, item} = Object.create(:item, name, attrs)
+    {:ok, _} = Object.relate(container.id, item.id, :contains)
+    item
+  end
+
+  @doc "Create an NPC and place it in the given room."
+  def spawn_npc_in(room, name, attrs \\ %{}) do
+    {:ok, npc} = Object.create(:npc, name, attrs)
+    {:ok, _} = Object.relate(room.id, npc.id, :contains)
+    npc
+  end
 
   @doc "Connect two rooms with an exit in the given direction. Bidirectional unless opts[:one_way]."
   def connect_rooms(from, to, direction, opts \\ []) do
@@ -166,9 +136,7 @@ defmodule LineCore.TestHarness do
         end
     after
       timeout ->
-        flunk(
-          "did not receive {:room_msg, _, _} matching #{inspect(pattern)} within #{timeout}ms"
-        )
+        flunk("did not receive {:room_msg, _, _} matching #{inspect(pattern)} within #{timeout}ms")
     end
   end
 

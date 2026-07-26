@@ -17,8 +17,7 @@ config :line_web, LineWebWeb.Endpoint,
   check_origin: false,
   code_reloader: true,
   debug_errors: true,
-  secret_key_base:
-    "dGhpcyBpcyBhIGRldmVsb3BtZW50IHNlY3JldCBrZXkgYmFzZSB0aGF0IHNob3VsZCBiZSBjaGFuZ2Vk",
+  secret_key_base: "dGhpcyBpcyBhIGRldmVsb3BtZW50IHNlY3JldCBrZXkgYmFzZSB0aGF0IHNob3VsZCBiZSBjaGFuZ2Vk",
   watchers: []
 
 # Enable dev routes for dashboard and mailbox

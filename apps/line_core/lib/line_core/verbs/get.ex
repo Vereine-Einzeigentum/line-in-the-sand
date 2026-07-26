@@ -8,6 +8,7 @@ defmodule LineCore.Verbs.Get do
 
   @behaviour LineCore.Verb
 
+
   @impl true
   def execute(_ctx, []), do: {:error, :get_what}
 
@@ -32,7 +33,8 @@ defmodule LineCore.Verbs.Get do
          [
            {:move, item.id, ctx.actor.id, :contains},
            {:notify_actor, "You pick up the #{item.name}."},
-           {:notify_room, "#{ctx.actor.name} picks up the #{item.name}.", except: [ctx.actor.id]}
+           {:notify_room, "#{ctx.actor.name} picks up the #{item.name}.",
+            except: [ctx.actor.id]}
          ]}
     end
   end
