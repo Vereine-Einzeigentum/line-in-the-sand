@@ -1,29 +1,29 @@
 defmodule LineCore.Schemas.Property do
   @moduledoc """
-  Key-value properties attached to objects.
+  Everything an object holds, and everything it points at.
 
-  EAV (entity-attribute-value) pattern. Each property is a row, which makes
-  schema flexible (no migrations to add new attributes) and queryable
-  (find all players with HP < 10).
+  A property is one row: a key, and one of two kinds of value.
 
-  Value is stored as JSONB so it can hold numbers, strings, booleans, maps,
-  or arrays. The application layer is responsible for type discipline.
+  - **Inert** — `value` holds a number, string, boolean, map or list. JSONB, so
+    scalars are wrapped as `%{"v" => scalar}` on the way in.
+  - **A reference** — `ref_id` names another object, with an optional number in
+    `num` attached to the reference.
+
+  There is no third kind and there is no edge table. The key carries the
+  meaning that a typed relationship used to: a room's `north` names an exit
+  object, a room's `knife` names a knife, a body's `left hand` names what it is
+  holding. Nothing declares that `north` is a direction or that `knife` is
+  contained, because nothing needs to — those are the names those things go by
+  here.
+
+  Both ends are indexed. A container's contents and a thing's whereabouts are
+  one row read from either side.
 
   Examples:
-    Player object:
-      hp -> 50, max_hp -> 50, fatigue -> 0, max_fatigue -> 40,
-      stress -> 0, dirham -> 100, yuan -> 0,
-      stat_wire -> 3, stat_shade -> 4, ..., stat_vigor -> 5,
-      skill_brawl -> 1, skill_scrap -> 2, skill_entry -> 0,
-      faction_rep_triad -> 5
-
-    Room object:
-      ambient -> "smell of solder and dust",
-      light -> :dim
-
-    Item object:
-      weight -> 1.5, condition -> 0.8, manufacturer -> "CRCC",
-      damage -> 8, damage_type -> :piercing
+      hp -> 12                          (inert)
+      ambient -> "solder and dust"      (inert)
+      north -> #exit_object             (reference)
+      knife -> #knife_object            (reference)
   """
 
   use Ecto.Schema
@@ -38,20 +38,49 @@ defmodule LineCore.Schemas.Property do
     belongs_to :object, Object
 
     field :key, :string
-    # JSONB column, but :map is Ecto's idiom for it
+
+    # JSONB column, but :map is Ecto's idiom for it. Nil when this property is
+    # a reference.
     field :value, :map
+
+    # The object this property points at. Nil when the property is inert.
+    belongs_to :ref, Object, foreign_key: :ref_id
+
+    # A number attached to a reference — a quantity, a level, a rating. Only
+    # meaningful alongside `ref_id`.
+    field :num, :float
 
     timestamps(type: :utc_datetime_usec)
   end
 
-  @required_fields [:object_id, :key, :value]
+  @required_fields [:object_id, :key]
+  @optional_fields [:value, :ref_id, :num]
 
   def changeset(property, attrs) do
     property
-    |> cast(attrs, @required_fields)
+    |> cast(attrs, @required_fields ++ @optional_fields)
     |> validate_required(@required_fields)
     |> validate_length(:key, min: 1, max: 64)
+    |> validate_one_kind()
     |> unique_constraint([:object_id, :key])
     |> foreign_key_constraint(:object_id)
+    |> foreign_key_constraint(:ref_id)
+  end
+
+  # Inert or a reference, not both and not neither.
+  defp validate_one_kind(changeset) do
+    value = get_field(changeset, :value)
+    ref_id = get_field(changeset, :ref_id)
+
+    case {is_nil(value), is_nil(ref_id)} do
+      {false, false} ->
+        add_error(changeset, :ref_id, "a property is inert or a reference, not both")
+
+      {true, true} ->
+        add_error(changeset, :value, "a property needs a value or a reference")
+
+      _ ->
+        changeset
+    end
   end
 end

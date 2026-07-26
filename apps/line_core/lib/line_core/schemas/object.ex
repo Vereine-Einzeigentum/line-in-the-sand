@@ -2,9 +2,13 @@ defmodule LineCore.Schemas.Object do
   @moduledoc """
   Base entity in the MOO graph.
 
-  Every thing in THE LINE is an object: players, rooms, items, NPCs.
-  Type discriminates behavior; properties hold mutable state; relationships
-  connect objects to other objects (containment, exits, ownership).
+  Every thing in THE LINE is an object: players, rooms, items, NPCs, exits.
+  Type discriminates behavior; properties hold everything else — both the
+  object's own state and every connection it has to another object.
+
+  There are no edges here. A connection is a property whose value is a
+  reference, filed under the name the referenced thing goes by. See
+  `LineCore.Schemas.Property`.
 
   This is the spine of the world. Verbs operate on objects. Look output
   renders from objects. Persistence is objects. Nothing else is foundational.
@@ -13,7 +17,7 @@ defmodule LineCore.Schemas.Object do
   use Ecto.Schema
   import Ecto.Changeset
 
-  alias LineCore.Schemas.{Property, Relationship}
+  alias LineCore.Schemas.Property
 
   @type id :: binary()
   @type object_type :: :player | :room | :item | :npc | :exit | :generic
@@ -43,15 +47,13 @@ defmodule LineCore.Schemas.Object do
     # but are filtered from queries.
     field :deleted_at, :utc_datetime_usec
 
-    # EAV pattern for flexible properties. Hot properties (HP, location)
-    # might get promoted to columns later if profiling demands it.
+    # Everything this object holds: its own state, and its references to other
+    # objects filed under the names they go by here.
     has_many :properties, Property, foreign_key: :object_id
 
-    # Outgoing edges (this object is the source).
-    has_many :outgoing_relationships, Relationship, foreign_key: :from_id
-
-    # Incoming edges (this object is the target).
-    has_many :incoming_relationships, Relationship, foreign_key: :to_id
+    # Every property, anywhere, that points at this object. Read this way round,
+    # a reference answers "where am I, and what do they call me there".
+    has_many :referenced_by, Property, foreign_key: :ref_id
 
     timestamps(type: :utc_datetime_usec)
   end
