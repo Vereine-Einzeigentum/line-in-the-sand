@@ -58,7 +58,7 @@ defmodule LineWebWeb.AuthController do
   def login(conn, _), do: json_error(conn, 400, "name and password required")
 
   defp sign_token(player_id) do
-    Phoenix.Token.sign(Endpoint, "player auth", player_id)
+    Phoenix.Token.sign(Endpoint, Endpoint.player_auth_salt(), player_id)
   end
 
   defp json_error(conn, status, message) do

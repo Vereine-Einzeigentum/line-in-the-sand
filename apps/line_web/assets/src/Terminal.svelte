@@ -26,8 +26,8 @@
   let signal = $state(50);
   let money = $state(0);
   let factions = $state([
-    { glyph: '淼', glyphColor: 'var(--chop)', name: 'THE BOUNDLESS', standing: 0, positive: true },
-    { glyph: '★', glyphColor: 'var(--sand)', name: 'DISTRICT POLICE', standing: 0, positive: true },
+    { glyph: '淼', glyphColor: 'var(--chop)', name: 'THE BOUNDLESS', standing: 0 },
+    { glyph: '★', glyphColor: 'var(--sand)', name: 'DISTRICT POLICE', standing: 0 },
   ]);
 
   // Minimap state
@@ -100,11 +100,6 @@
     return { char: c, color: MM_COL[c] || 'var(--text-faint)' };
   }
 
-  function now() {
-    const d = new Date();
-    return d.toTimeString().slice(0, 8);
-  }
-
   function lineClass(line) {
     let cls = 'line';
     if (line.scope === 'echo') cls += ' echo';
@@ -169,7 +164,7 @@
   function sendComms() {
     const msg = commsInput.trim();
     if (!msg) return;
-    onSubmit(`${commsChannel === 'global' ? 'say' : 'say'} ${msg}`);
+    onSubmit(`say ${msg}`);
     commsInput = '';
   }
 

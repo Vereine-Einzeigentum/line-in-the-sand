@@ -37,25 +37,16 @@ defmodule LineCore.Verbs.Sell do
   ## Helpers
 
   defp find_in_inventory(actor_id, name) do
-    name_down = String.downcase(name)
-
     actor_id
     |> Object.contents()
     |> Enum.filter(&(&1.type == :item))
-    |> Enum.find(fn item ->
-      item_name = String.downcase(item.name)
-      item_name == name_down or String.contains?(item_name, name_down)
-    end)
+    |> Object.find_by_name(name)
   end
 
   defp find_npc_in_room(room_contents, name) do
-    name_down = String.downcase(name)
-
-    Enum.find(room_contents, fn obj ->
-      obj.type == :npc and
-        (String.downcase(obj.name) == name_down or
-           String.contains?(String.downcase(obj.name), name_down))
-    end)
+    room_contents
+    |> Enum.filter(&(&1.type == :npc))
+    |> Object.find_by_name(name)
   end
 
   defp resolve_sale(ctx, item, npc) do

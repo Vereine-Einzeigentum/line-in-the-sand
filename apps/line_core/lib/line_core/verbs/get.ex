@@ -8,20 +8,17 @@ defmodule LineCore.Verbs.Get do
 
   @behaviour LineCore.Verb
 
+  alias LineCore.Object
+
   @impl true
   def execute(_ctx, []), do: {:error, :get_what}
 
   def execute(ctx, [name]) do
-    name_down = String.downcase(name)
-
     candidate =
       ctx.room_contents
       |> Enum.reject(&(&1.id == ctx.actor.id))
       |> Enum.filter(&(&1.type == :item))
-      |> Enum.find(fn item ->
-        item_name = String.downcase(item.name)
-        item_name == name_down or String.contains?(item_name, name_down)
-      end)
+      |> Object.find_by_name(name)
 
     case candidate do
       nil ->

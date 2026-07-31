@@ -7,7 +7,7 @@ defmodule LineWebWeb.PlayerSocket do
   def connect(%{"token" => token}, socket, _connect_info) do
     case Phoenix.Token.verify(
            LineWebWeb.Endpoint,
-           "player auth",
+           LineWebWeb.Endpoint.player_auth_salt(),
            token,
            max_age: 86_400 * 30
          ) do

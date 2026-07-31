@@ -171,8 +171,7 @@ defmodule LineCore.Object do
     name_down = String.downcase(name)
 
     Enum.find(objects, fn o ->
-      String.downcase(o.name) == name_down or
-        String.contains?(String.downcase(o.name), name_down)
+      String.contains?(String.downcase(o.name), name_down)
     end)
   end
 

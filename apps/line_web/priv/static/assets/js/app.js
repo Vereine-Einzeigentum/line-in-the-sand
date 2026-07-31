@@ -4429,15 +4429,13 @@ function Terminal($$anchor, $$props) {
       glyph: "淼",
       glyphColor: "var(--chop)",
       name: "THE BOUNDLESS",
-      standing: 0,
-      positive: true
+      standing: 0
     },
     {
       glyph: "★",
       glyphColor: "var(--sand)",
       name: "DISTRICT POLICE",
-      standing: 0,
-      positive: true
+      standing: 0
     }
   ]);
   const MM_EMPTY = [
@@ -4557,7 +4555,7 @@ function Terminal($$anchor, $$props) {
   function sendComms() {
     const msg = get(commsInput).trim();
     if (!msg) return;
-    $$props.onSubmit(`${get(commsChannel) === "global" ? "say" : "say"} ${msg}`);
+    $$props.onSubmit(`say ${msg}`);
     set(commsInput, "");
   }
   function commsKeydown(e) {

@@ -93,14 +93,12 @@ defmodule LineWebWeb.PlayerChannel do
         nil -> nil
       end
 
-    cond do
-      new_room_id == socket.assigns.room_id ->
-        socket
-
-      true ->
-        if socket.assigns.room_id, do: PubSub.unsubscribe({:room, socket.assigns.room_id})
-        if new_room_id, do: :ok = PubSub.subscribe({:room, new_room_id})
-        assign(socket, :room_id, new_room_id)
+    if new_room_id == socket.assigns.room_id do
+      socket
+    else
+      if socket.assigns.room_id, do: PubSub.unsubscribe({:room, socket.assigns.room_id})
+      if new_room_id, do: :ok = PubSub.subscribe({:room, new_room_id})
+      assign(socket, :room_id, new_room_id)
     end
   end
 
