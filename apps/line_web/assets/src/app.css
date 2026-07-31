@@ -1,0 +1,47 @@
+:root{
+  --void:#0d0a14; --void-2:#141020; --panel:#181222; --panel-2:#1f1730;
+  --line:#2c2340; --line-2:#3a2f52;
+  --amber:#ffb648; --amber-dim:#b9823a;
+  --cyan:#52d4e0; --cyan-dim:#357f88;
+  --magenta:#ff5aa6; --green:#6fe39f; --red:#ff5a52;
+  --gold:#d4a93f; --mosque:#2f6aa8;
+  --ember:#ff8a3d; --rust:#a8602f; --jade:#5b9c6a; --chop:#cf3a2e; --sand:#c2a878;
+  --text:#d9d0ea; --text-dim:#867a9e; --text-faint:#574d6b;
+  --bg:var(--void); --fg:var(--text);
+  --feed-bg:var(--void); --panel-bg:var(--panel);
+  --scan-op:0.22; --glow:0 0 8px;
+  --mono:'JetBrains Mono',ui-monospace,'SF Mono','Cascadia Code','Roboto Mono',Menlo,Consolas,monospace;
+}
+html[data-theme="light"]{
+  --void:#efe7d3; --void-2:#e8dec5; --panel:#f4eedd; --panel-2:#ece2cb;
+  --line:#d8cba8; --line-2:#c8b78c;
+  --amber:#b8701a; --amber-dim:#caa05a;
+  --cyan:#1d7d8a; --cyan-dim:#5ba3ac;
+  --magenta:#c0327a; --green:#2e8d54; --red:#c4392f;
+  --gold:#9c7414; --mosque:#2f6aa8;
+  --text:#221c12; --text-dim:#6b5f44; --text-faint:#a99a76;
+  --scan-op:0.05; --glow:0 0 0;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--void); color:var(--text);
+  font-family:var(--mono); font-size:13px; line-height:1.5;
+  overflow:hidden; -webkit-font-smoothing:antialiased;
+  position:relative;
+}
+#app{
+  height:100%; width:100%;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+input, button, textarea {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: none;
+  outline: none;
+}
+button { cursor: pointer; }

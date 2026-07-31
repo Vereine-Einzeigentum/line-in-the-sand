@@ -29,4 +29,11 @@ defmodule LineWebWeb.Router do
     get "/sessions/:token/feed", PlaytestController, :feed
     delete "/sessions/:token", PlaytestController, :delete
   end
+
+  scope "/api", LineWebWeb do
+    pipe_through :api
+
+    post "/register", AuthController, :register
+    post "/login", AuthController, :login
+  end
 end

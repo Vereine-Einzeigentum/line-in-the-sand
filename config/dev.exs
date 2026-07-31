@@ -19,7 +19,10 @@ config :line_web, LineWebWeb.Endpoint,
   debug_errors: true,
   secret_key_base:
     "dGhpcyBpcyBhIGRldmVsb3BtZW50IHNlY3JldCBrZXkgYmFzZSB0aGF0IHNob3VsZCBiZSBjaGFuZ2Vk",
-  watchers: []
+  watchers: [
+    node: ["node_modules/.bin/vite", "build", "--watch",
+      cd: Path.expand("../apps/line_web/assets", __DIR__)]
+  ]
 
 # Enable dev routes for dashboard and mailbox
 config :line_web, dev_routes: true

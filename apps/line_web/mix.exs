@@ -39,6 +39,7 @@ defmodule LineWeb.MixProject do
       {:jason, "~> 1.2"},
       {:dns_cluster, "~> 0.1.3"},
       {:bandit, "~> 1.5"},
+      {:bcrypt_elixir, "~> 3.1"},
       {:line_core, in_umbrella: true},
       {:line_shared, in_umbrella: true}
     ]

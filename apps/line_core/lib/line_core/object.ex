@@ -202,6 +202,18 @@ defmodule LineCore.Object do
     |> Repo.all()
   end
 
+  @doc "Find a player by name (case-insensitive). Returns the object or nil."
+  def find_player_by_name(name) when is_binary(name) do
+    normalized = String.downcase(String.trim(name))
+
+    from(o in Object,
+      where: o.type == :player and is_nil(o.deleted_at),
+      where: fragment("lower(?) = ?", o.name, ^normalized),
+      limit: 1
+    )
+    |> Repo.one()
+  end
+
   ## Direction canonicalization
 
   @directions %{

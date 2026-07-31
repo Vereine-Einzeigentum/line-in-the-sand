@@ -11,7 +11,7 @@ defmodule LineWebWeb.Endpoint do
     same_site: "Lax"
   ]
 
-  socket "/socket", LineWebWeb.UserSocket,
+  socket "/socket", LineWebWeb.PlayerSocket,
     websocket: true,
     longpoll: false
 
