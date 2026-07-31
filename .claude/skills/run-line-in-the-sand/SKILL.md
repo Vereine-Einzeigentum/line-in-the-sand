@@ -11,7 +11,6 @@ The login page is at `/`, and the Terminal UI renders after authentication via
 ## Prerequisites
 
 Postgres must be running. The session-start hook handles this automatically.
-Elixir 1.16+ / OTP 26+ and Node 20+ are required (pre-installed in the container).
 
 ## Setup
 
@@ -51,8 +50,6 @@ curl -s -X POST http://localhost:4000/api/register \
   -d '{"name":"smoketest","password":"smoketest123"}'
 # → {"token":"...","player_id":"..."}
 ```
-
-If the name is taken, use `/api/login` with the same body shape.
 
 ### 3. Screenshot the login page
 
@@ -115,15 +112,10 @@ send commands via `cmd` event with `{"raw": "look"}`.
 
 ## Gotchas
 
-- **"Connecting..." loop in Terminal UI** — the WebSocket connects and authenticates
-  fine, but `PlayerChannel.join` calls `LineCore.Dispatcher` which expects the player
-  to have a room assignment. A freshly registered player has no room, so the channel
-  join fails and the client reconnects in a loop. This is expected in Phase 0 — the
-  game world (rooms, exits) needs to be seeded first.
-
-- **Vite watcher uses `node` not `npx`** — the dev config points directly at
-  `node_modules/.bin/vite` inside `apps/line_web/assets/`. If `npm install` hasn't
-  been run there, the watcher silently fails and assets aren't rebuilt on change.
+- **"Connecting..." loop in Terminal UI** — `PlayerChannel.join` requires the
+  player to have a room assignment. A freshly registered player has no room,
+  so the channel join fails and the client reconnects. The game world (rooms,
+  exits) needs to be seeded for channel join to succeed.
 
 - **Svelte component classes are hashed** — don't select by `.terminal` or `.app`.
   The Svelte compiler hashes class names (e.g. `svelte-5zgg7r`). Use semantic
@@ -134,10 +126,6 @@ send commands via `cmd` event with `{"raw": "look"}`.
   relaunching.
 
 ## Troubleshooting
-
-- **`(Postgrex.Error) FATAL 28P01 password authentication failed`**: Postgres
-  credentials in `config/dev.exs` are `postgres`/`postgres`. The session-start hook
-  configures this, but if running manually ensure Postgres is up with those creds.
 
 - **`npm run build` fails with "Cannot find module svelte"**: Run `npm install`
   inside `apps/line_web/assets/` first.

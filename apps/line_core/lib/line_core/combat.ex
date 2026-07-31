@@ -59,10 +59,10 @@ defmodule LineCore.Combat do
 
     [
       {:set_property, target_id, "hp_current", new_hp},
-      {:notify_actor, "You hit #{target.name} for #{damage} damage. (#{new_hp} HP remaining)"},
-      {:notify_object, target_id,
-       "#{attacker.name} hits you for #{damage} damage. (#{new_hp} HP remaining)"},
-      {:notify_room, "#{attacker.name} hits #{target.name}.", except: [attacker_id, target_id]}
+      {:notify_actor, "[combat] #{target.name}: -#{damage} (#{new_hp} hp)"},
+      {:notify_object, target_id, "[combat] #{attacker.name}: -#{damage} (#{new_hp} hp)"},
+      {:notify_room, "[combat] #{attacker.name} -> #{target.name}: #{damage}",
+       except: [attacker_id, target_id]}
     ]
   end
 
@@ -96,12 +96,11 @@ defmodule LineCore.Combat do
 
     drop_events ++
       [
-        {:notify_room, "#{victim.name} collapses, motionless."},
+        {:notify_room, "[death] #{victim.name}"},
         {:move, victim_id, safehouse_id, :contains},
         {:set_property, victim_id, "hp_current", max_hp},
         {:set_property, victim_id, "dirham", new_dirham},
-        {:notify_object, victim_id,
-         "Everything goes dark. You wake at the safehouse, body restored — #{penalty} Dirham lighter."}
+        {:notify_object, victim_id, "[death] respawned at safehouse (-#{penalty} dirham)"}
       ]
   end
 
@@ -125,7 +124,7 @@ defmodule LineCore.Combat do
           Enum.flat_map(carried, fn item ->
             [
               {:move, item.id, room_id, :contains},
-              {:notify_room, "#{victim.name}'s #{item.name} clatters to the ground.",
+              {:notify_room, "[death] #{victim.name} drops #{item.name}",
                except: [victim_id]}
             ]
           end)
@@ -135,7 +134,7 @@ defmodule LineCore.Combat do
             [
               {:unrelate, victim_id, item.id, rel_type},
               {:relate, room_id, item.id, :contains},
-              {:notify_room, "#{victim.name}'s #{item.name} clatters to the ground.",
+              {:notify_room, "[death] #{victim.name} drops #{item.name}",
                except: [victim_id]}
             ]
           end)
