@@ -79,6 +79,18 @@ defmodule LineCore.Object do
   defp unwrap(%{"v" => v}), do: v
   defp unwrap(other), do: other
 
+  @doc "Get all properties whose key starts with the given prefix."
+  def properties_by_prefix(object_id, prefix) when is_binary(prefix) do
+    like_pattern = prefix <> "%"
+
+    from(p in Property,
+      where: p.object_id == ^object_id and like(p.key, ^like_pattern),
+      select: {p.key, p.value}
+    )
+    |> Repo.all()
+    |> Enum.map(fn {k, v} -> {k, unwrap(v)} end)
+  end
+
   ## Relationships
 
   @doc "Create a relationship between two objects."

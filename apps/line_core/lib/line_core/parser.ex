@@ -54,6 +54,9 @@ defmodule LineCore.Parser do
     "sell" => Verbs.Sell,
     "fence" => Verbs.Sell,
 
+    # Body / identity
+    "@bare" => Verbs.Bare,
+
     # System
     "@password" => Verbs.Password
   }
@@ -133,6 +136,13 @@ defmodule LineCore.Parser do
   defp parse_args(Verbs.Sell, rest) do
     case Regex.run(~r/^(.+?)\s+(?:to|at)\s+(.+)$/i, rest) do
       [_, item, target] -> [String.trim(item), String.trim(target)]
+      _ -> [rest]
+    end
+  end
+
+  defp parse_args(Verbs.Bare, rest) do
+    case Regex.run(~r/^(.+?)\s+as\s+(.+)$/i, rest) do
+      [_, part, description] -> [part, description]
       _ -> [rest]
     end
   end

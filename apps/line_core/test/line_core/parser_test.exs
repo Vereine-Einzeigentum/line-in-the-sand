@@ -128,6 +128,26 @@ defmodule LineCore.ParserTest do
     end
   end
 
+  describe "parse/1 — @bare verb structure" do
+    test "@bare <part> as <description>" do
+      assert {:ok, Verbs.Bare, ["feet", "%P has tiny feet."]} =
+               Parser.parse("@bare feet as %P has tiny feet.")
+    end
+
+    test "@bare with multi-word part" do
+      assert {:ok, Verbs.Bare, ["left hand", "scarred and calloused"]} =
+               Parser.parse("@bare left hand as scarred and calloused")
+    end
+
+    test "@bare without as gives single arg" do
+      assert {:ok, Verbs.Bare, ["feet"]} = Parser.parse("@bare feet")
+    end
+
+    test "bare without @ prefix is unknown" do
+      assert {:unknown, "bare", _} = Parser.parse("bare feet as test")
+    end
+  end
+
   describe "parse/1 — who verb" do
     test "bare who" do
       assert {:ok, Verbs.Who, []} = Parser.parse("who")
