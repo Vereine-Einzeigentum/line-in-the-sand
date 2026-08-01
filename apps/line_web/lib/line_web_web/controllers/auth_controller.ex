@@ -64,7 +64,7 @@ defmodule LineWebWeb.AuthController do
 
   defp login_failed(conn) do
     json_error(conn, 401,
-      "if you forgot your account info, email evermoor.a.a@gmail.com from the account you registered with")
+      "if you forgot your account info, email admin@example.com from the account you registered with")
   end
 
   defp sign_token(player_id) do
