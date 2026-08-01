@@ -43,19 +43,29 @@ defmodule LineWebWeb.AuthController do
       when is_binary(name) and is_binary(password) do
     name = String.trim(name)
 
-    with %{id: player_id} = _player <- Object.find_player_by_name(name),
-         hash when is_binary(hash) <- Object.get_property(player_id, "password_hash"),
-         true <- Bcrypt.verify_pass(password, hash) do
-      token = sign_token(player_id)
-      json(conn, %{token: token, player_id: player_id})
-    else
-      _ ->
+    case Object.find_player_by_name(name) do
+      %{id: player_id} ->
+        hash = Object.get_property(player_id, "password_hash")
+
+        if is_binary(hash) and Bcrypt.verify_pass(password, hash) do
+          token = sign_token(player_id)
+          json(conn, %{token: token, player_id: player_id})
+        else
+          login_failed(conn)
+        end
+
+      nil ->
         Bcrypt.no_user_verify()
-        json_error(conn, 401, "invalid name or password")
+        login_failed(conn)
     end
   end
 
   def login(conn, _), do: json_error(conn, 400, "name and password required")
+
+  defp login_failed(conn) do
+    json_error(conn, 401,
+      "if you forgot your account info, email evermoor.a.a@gmail.com from the account you registered with")
+  end
 
   defp sign_token(player_id) do
     Phoenix.Token.sign(Endpoint, Endpoint.player_auth_salt(), player_id)
