@@ -1,7 +1,8 @@
 #!/bin/bash
 # SessionStart hook: provision Elixir/OTP + Postgres for Claude Code on the web.
 # Installs OTP 26 + Elixir 1.16 (precompiled, checksum-verified), fetches mix
-# deps, and starts PostgreSQL so `mix test` works out of the box.
+# deps, creates/migrates databases, builds assets, and compiles both envs so
+# everything works out of the box with zero manual setup.
 set -euo pipefail
 
 # Only needed in remote (web) sessions; local machines manage their own toolchain.
@@ -71,8 +72,19 @@ if [ -f apps/line_web/assets/package-lock.json ]; then
   npm install --prefix apps/line_web/assets
 fi
 
-# Warm the test build so `mix test` is fast on first use. The `test` alias
-# also creates and migrates the test database.
-MIX_ENV=test mix compile
+# --- Dev environment: compile + create/migrate database ---
+mix compile
+mix ecto.create --quiet 2>/dev/null || true
+mix ecto.migrate --quiet
 
-echo "session-start: Elixir $(elixir --short-version 2>/dev/null || true) / OTP ${OTP_VERSION} ready, Postgres up, deps compiled"
+# --- Test environment: compile + create/migrate database ---
+MIX_ENV=test mix compile
+MIX_ENV=test mix ecto.create --quiet 2>/dev/null || true
+MIX_ENV=test mix ecto.migrate --quiet
+
+# --- Build frontend assets so phx.server works immediately ---
+if [ -f apps/line_web/assets/package.json ]; then
+  npm run --prefix apps/line_web/assets build 2>/dev/null || true
+fi
+
+echo "session-start: Elixir $(elixir --short-version 2>/dev/null || true) / OTP ${OTP_VERSION} ready, Postgres up, dev+test compiled, DBs migrated"
