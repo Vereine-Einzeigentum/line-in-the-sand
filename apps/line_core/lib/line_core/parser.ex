@@ -56,6 +56,7 @@ defmodule LineCore.Parser do
 
     # Body / identity
     "@bare" => Verbs.Bare,
+    "@gender" => Verbs.Gender,
 
     # System
     "@password" => Verbs.Password
@@ -144,6 +145,13 @@ defmodule LineCore.Parser do
     case Regex.run(~r/^(.+?)\s+as\s+(.+)$/i, rest) do
       [_, part, description] -> [part, description]
       _ -> [rest]
+    end
+  end
+
+  defp parse_args(Verbs.Gender, rest) do
+    case Regex.run(~r/^me\s+as\s+(.+)$/i, rest) do
+      [_, gender] -> [gender]
+      _ -> []
     end
   end
 
