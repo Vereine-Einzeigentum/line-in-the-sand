@@ -66,6 +66,11 @@ mix local.hex --force --if-missing
 mix local.rebar --force --if-missing
 mix deps.get
 
+# --- Frontend assets (Svelte + Vite) ---
+if [ -f apps/line_web/assets/package-lock.json ]; then
+  npm install --prefix apps/line_web/assets
+fi
+
 # Warm the test build so `mix test` is fast on first use. The `test` alias
 # also creates and migrates the test database.
 MIX_ENV=test mix compile
