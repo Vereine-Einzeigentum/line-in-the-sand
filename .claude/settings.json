@@ -12,11 +12,11 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "mcp__Claude_Code_Remote__send_later|mcp__Claude_Code_Remote__create_trigger|mcp__Claude_Code_Remote__fire_trigger|mcp__Claude_Code_Remote__update_trigger|CronCreate|ScheduleWakeup",
+        "matcher": "mcp__Claude_Code_Remote__send_later|CronCreate|ScheduleWakeup",
         "hooks": [
           {
             "type": "command",
-            "command": "echo '{\"decision\":\"block\",\"reason\":\"Scheduling tools are permanently disabled. No crons, no triggers, no send_later. Ever.\"}'"
+            "command": "echo '{\"decision\":\"block\",\"reason\":\"No crons. No session links. Ever.\"}'"
           }
         ]
       }
