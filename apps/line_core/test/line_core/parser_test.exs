@@ -108,24 +108,23 @@ defmodule LineCore.ParserTest do
     end
   end
 
-  describe "parse/1 — desc verb structure" do
-    test "desc me as <description>" do
+  describe "parse/1 — @desc verb structure" do
+    test "@desc me as <description>" do
       assert {:ok, Verbs.Desc, ["scarred and quiet"]} =
-               Parser.parse("desc me as scarred and quiet")
+               Parser.parse("@desc me as scarred and quiet")
     end
 
-    test "describe me as <description>" do
-      assert {:ok, Verbs.Desc, ["tall, wired"]} =
-               Parser.parse("describe me as tall, wired")
+    test "@desc self as <description>" do
+      assert {:ok, Verbs.Desc, ["weary"]} = Parser.parse("@desc self as weary")
     end
 
-    test "desc self as <description>" do
-      assert {:ok, Verbs.Desc, ["weary"]} = Parser.parse("desc self as weary")
-    end
-
-    test "desc <object> as <description>" do
+    test "@desc <object> as <description>" do
       assert {:ok, Verbs.Desc, ["knife", "a dented blade"]} =
-               Parser.parse("desc knife as a dented blade")
+               Parser.parse("@desc knife as a dented blade")
+    end
+
+    test "bare desc is unknown" do
+      assert {:unknown, "desc", _} = Parser.parse("desc me as test")
     end
   end
 

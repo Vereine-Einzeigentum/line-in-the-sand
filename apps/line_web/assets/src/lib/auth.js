@@ -15,8 +15,8 @@ async function post(path, body) {
   return data;
 }
 
-export function register({ name, password }) {
-  return post('/register', { name, password });
+export function requestAccount({ name, email }) {
+  return post('/request', { name, email });
 }
 
 export function login({ name, password }) {

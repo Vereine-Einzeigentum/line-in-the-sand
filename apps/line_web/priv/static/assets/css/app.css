@@ -75,6 +75,12 @@
     padding: 4px 0;
   }
 
+  .info.svelte-o2dhro {
+    color: var(--cyan);
+    font-size: 12px;
+    padding: 4px 0;
+  }
+
   /* CRT overlays */
   #crt{position:fixed;inset:0;pointer-events:none;z-index:90;
     background:repeating-linear-gradient(0deg,rgba(0,0,0,var(--scan-op)) 0 1px,transparent 1px 3px);

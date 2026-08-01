@@ -27,6 +27,7 @@ defmodule LineCore.MixProject do
       {:ecto_sql, "~> 3.11"},
       {:postgrex, ">= 0.0.0"},
       {:phoenix_pubsub, "~> 2.1"},
+      {:bcrypt_elixir, "~> 3.1"},
       {:line_shared, in_umbrella: true}
     ]
   end

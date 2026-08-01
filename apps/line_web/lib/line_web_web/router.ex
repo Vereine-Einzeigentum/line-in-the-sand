@@ -33,7 +33,7 @@ defmodule LineWebWeb.Router do
   scope "/api", LineWebWeb do
     pipe_through :api
 
-    post "/register", AuthController, :register
+    post "/request", AuthController, :request_account
     post "/login", AuthController, :login
   end
 end

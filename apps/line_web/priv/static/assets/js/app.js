@@ -65,7 +65,6 @@ const REACTION_IS_UPDATING = 1 << 21;
 const ASYNC = 1 << 22;
 const ERROR_VALUE = 1 << 23;
 const STATE_SYMBOL = Symbol("$state");
-const LOADING_ATTR_SYMBOL = Symbol("");
 const ATTRIBUTES_CACHE = Symbol("attributes");
 const CLASS_CACHE = Symbol("class");
 const STYLE_CACHE = Symbol("style");
@@ -4044,9 +4043,6 @@ const IS_HTML = Symbol("is html");
 function set_attribute(element, attribute, value, skip_warning) {
   var attributes = get_attributes(element);
   if (attributes[attribute] === (attributes[attribute] = value)) return;
-  if (attribute === "loading") {
-    element[LOADING_ATTR_SYMBOL] = value;
-  }
   if (value == null) {
     element.removeAttribute(attribute);
   } else if (typeof value !== "string" && get_setters(element).includes(attribute)) {
@@ -4257,8 +4253,8 @@ async function post(path, body) {
   }
   return data;
 }
-function register({ name, password }) {
-  return post("/register", { name, password });
+function requestAccount({ name, email }) {
+  return post("/request", { name, email });
 }
 function login({ name, password }) {
   return post("/login", { name, password });
@@ -4284,82 +4280,155 @@ function clearSession() {
   } catch {
   }
 }
-var root$1 = /* @__PURE__ */ from_html(`<div class="error svelte-o2dhro"> </div>`);
-var root_1$1 = /* @__PURE__ */ from_html(`<div class="login svelte-o2dhro"><div class="brand svelte-o2dhro"><div class="title svelte-o2dhro">LINE IN THE SAND</div> <div class="subtitle svelte-o2dhro">— phase 0 —</div></div> <form class="svelte-o2dhro"><label class="svelte-o2dhro"><span class="svelte-o2dhro">name</span> <input type="text" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" required="" class="svelte-o2dhro"/></label> <label class="svelte-o2dhro"><span class="svelte-o2dhro">password</span> <input type="password" required="" class="svelte-o2dhro"/></label> <!> <button type="submit" class="svelte-o2dhro"><!></button> <button type="button" class="switch svelte-o2dhro"> </button></form></div>`);
+var root$1 = /* @__PURE__ */ from_html(`<label class="svelte-o2dhro"><span class="svelte-o2dhro">name</span> <input type="text" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" required="" class="svelte-o2dhro"/></label> <label class="svelte-o2dhro"><span class="svelte-o2dhro">password</span> <input type="password" autocomplete="current-password" required="" class="svelte-o2dhro"/></label>`, 1);
+var root_1$1 = /* @__PURE__ */ from_html(`<label class="svelte-o2dhro"><span class="svelte-o2dhro">name</span> <input type="text" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" required="" class="svelte-o2dhro"/></label> <label class="svelte-o2dhro"><span class="svelte-o2dhro">email</span> <input type="email" autocomplete="email" required="" class="svelte-o2dhro"/></label>`, 1);
+var root_2$1 = /* @__PURE__ */ from_html(`<div class="error svelte-o2dhro"> </div>`);
+var root_3$1 = /* @__PURE__ */ from_html(`<div class="info svelte-o2dhro"> </div>`);
+var root_4$1 = /* @__PURE__ */ from_html(`<button type="button" class="switch svelte-o2dhro">request an account</button>`);
+var root_5$1 = /* @__PURE__ */ from_html(`<button type="button" class="switch svelte-o2dhro">log in instead</button>`);
+var root_6$1 = /* @__PURE__ */ from_html(`<div class="login svelte-o2dhro"><div class="brand svelte-o2dhro"><div class="title svelte-o2dhro">LINE IN THE SAND</div> <div class="subtitle svelte-o2dhro">— phase 0 —</div></div> <form class="svelte-o2dhro"><!> <!> <!> <button type="submit" class="svelte-o2dhro"><!></button> <!></form></div>`);
 function Login($$anchor, $$props) {
   push($$props, true);
   let name = /* @__PURE__ */ state("");
   let password = /* @__PURE__ */ state("");
+  let email = /* @__PURE__ */ state("");
   let mode = /* @__PURE__ */ state("login");
   let busy = /* @__PURE__ */ state(false);
   let error = /* @__PURE__ */ state("");
+  let info = /* @__PURE__ */ state("");
   async function submit(e) {
     e.preventDefault();
-    if (!get(name) || !get(password) || get(busy)) return;
+    if (get(busy)) return;
     set(busy, true);
     set(error, "");
+    set(info, "");
     try {
-      const fn = get(mode) === "login" ? login : register;
-      const session = await fn({ name: get(name), password: get(password) });
-      $$props.onAuthed(session);
+      if (get(mode) === "login") {
+        if (!get(name) || !get(password)) return;
+        const session = await login({ name: get(name), password: get(password) });
+        $$props.onAuthed(session);
+      } else if (get(mode) === "request") {
+        if (!get(name) || !get(email)) return;
+        await requestAccount({ name: get(name), email: get(email) });
+        set(info, "check your email for a temporary password");
+        set(mode, "login");
+        set(email, "");
+      }
     } catch (err) {
       set(error, err.message || "failed", true);
     } finally {
       set(busy, false);
     }
   }
-  var div = root_1$1();
+  function switchMode(to) {
+    set(mode, to, true);
+    set(error, "");
+    set(info, "");
+    set(password, "");
+  }
+  var div = root_6$1();
   var form = sibling(child(div), 2);
-  var label = child(form);
-  var input = sibling(child(label), 2);
-  var label_1 = sibling(label, 2);
-  var input_1 = sibling(child(label_1), 2);
-  var node = sibling(label_1, 2);
+  var node = child(form);
   {
     var consequent = ($$anchor2) => {
-      var div_1 = root$1();
+      var fragment = root$1();
+      var label = first_child(fragment);
+      var input = sibling(child(label), 2);
+      var label_1 = sibling(label, 2);
+      var input_1 = sibling(child(label_1), 2);
+      template_effect(() => {
+        input.disabled = get(busy);
+        input_1.disabled = get(busy);
+      });
+      bind_value(input, () => get(name), ($$value) => set(name, $$value));
+      bind_value(input_1, () => get(password), ($$value) => set(password, $$value));
+      append($$anchor2, fragment);
+    };
+    var consequent_1 = ($$anchor2) => {
+      var fragment_1 = root_1$1();
+      var label_2 = first_child(fragment_1);
+      var input_2 = sibling(child(label_2), 2);
+      var label_3 = sibling(label_2, 2);
+      var input_3 = sibling(child(label_3), 2);
+      template_effect(() => {
+        input_2.disabled = get(busy);
+        input_3.disabled = get(busy);
+      });
+      bind_value(input_2, () => get(name), ($$value) => set(name, $$value));
+      bind_value(input_3, () => get(email), ($$value) => set(email, $$value));
+      append($$anchor2, fragment_1);
+    };
+    if_block(node, ($$render) => {
+      if (get(mode) === "login") $$render(consequent);
+      else if (get(mode) === "request") $$render(consequent_1, 1);
+    });
+  }
+  var node_1 = sibling(node, 2);
+  {
+    var consequent_2 = ($$anchor2) => {
+      var div_1 = root_2$1();
       var text2 = child(div_1);
       template_effect(() => set_text(text2, get(error)));
       append($$anchor2, div_1);
     };
-    if_block(node, ($$render) => {
-      if (get(error)) $$render(consequent);
+    if_block(node_1, ($$render) => {
+      if (get(error)) $$render(consequent_2);
     });
   }
-  var button = sibling(node, 2);
-  var node_1 = child(button);
+  var node_2 = sibling(node_1, 2);
   {
-    var consequent_1 = ($$anchor2) => {
-      var text_1 = text("…");
-      append($$anchor2, text_1);
+    var consequent_3 = ($$anchor2) => {
+      var div_2 = root_3$1();
+      var text_1 = child(div_2);
+      template_effect(() => set_text(text_1, get(info)));
+      append($$anchor2, div_2);
     };
-    var alternate = ($$anchor2) => {
-      var text_2 = text();
-      template_effect(() => set_text(text_2, get(mode)));
+    if_block(node_2, ($$render) => {
+      if (get(info)) $$render(consequent_3);
+    });
+  }
+  var button = sibling(node_2, 2);
+  var node_3 = child(button);
+  {
+    var consequent_4 = ($$anchor2) => {
+      var text_2 = text("…");
       append($$anchor2, text_2);
     };
-    if_block(node_1, ($$render) => {
-      if (get(busy)) $$render(consequent_1);
+    var consequent_5 = ($$anchor2) => {
+      var text_3 = text("login");
+      append($$anchor2, text_3);
+    };
+    var alternate = ($$anchor2) => {
+      var text_4 = text("request");
+      append($$anchor2, text_4);
+    };
+    if_block(node_3, ($$render) => {
+      if (get(busy)) $$render(consequent_4);
+      else if (get(mode) === "login") $$render(consequent_5, 1);
       else $$render(alternate, -1);
     });
   }
-  var button_1 = sibling(button, 2);
-  var text_3 = child(button_1);
-  template_effect(() => {
-    input.disabled = get(busy);
-    set_attribute(input_1, "autocomplete", get(mode) === "login" ? "current-password" : "new-password");
-    input_1.disabled = get(busy);
-    button.disabled = get(busy);
-    button_1.disabled = get(busy);
-    set_text(text_3, get(mode) === "login" ? "register instead" : "log in instead");
-  });
+  var node_4 = sibling(button, 2);
+  {
+    var consequent_6 = ($$anchor2) => {
+      var button_1 = root_4$1();
+      template_effect(() => button_1.disabled = get(busy));
+      delegated("click", button_1, () => switchMode("request"));
+      append($$anchor2, button_1);
+    };
+    var alternate_1 = ($$anchor2) => {
+      var button_2 = root_5$1();
+      template_effect(() => button_2.disabled = get(busy));
+      delegated("click", button_2, () => switchMode("login"));
+      append($$anchor2, button_2);
+    };
+    if_block(node_4, ($$render) => {
+      if (get(mode) === "login") $$render(consequent_6);
+      else $$render(alternate_1, -1);
+    });
+  }
+  template_effect(() => button.disabled = get(busy));
   event("submit", form, submit);
-  bind_value(input, () => get(name), ($$value) => set(name, $$value));
-  bind_value(input_1, () => get(password), ($$value) => set(password, $$value));
-  delegated("click", button_1, () => {
-    set(mode, get(mode) === "login" ? "register" : "login", true);
-    set(error, "");
-  });
   append($$anchor, div);
   pop();
 }
