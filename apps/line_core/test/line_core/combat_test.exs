@@ -105,7 +105,7 @@ defmodule LineCore.CombatTest do
       target = TestHarness.spawn_player_in(room, "Target")
 
       TestHarness.dispatch(attacker, Attack, ["Target"])
-      TestHarness.assert_msg(~r/You hit Target for 10 damage/)
+      TestHarness.assert_msg(~r/\[combat\] Target: -10 \(40 hp\)/)
 
       {current, _} = Combat.hp(target.id)
       assert current == 40
@@ -120,6 +120,7 @@ defmodule LineCore.CombatTest do
     test "errors when attacking self" do
       room = TestHarness.spawn_room("Hub")
       player = TestHarness.spawn_player_in(room, "Solo")
+
       # find_target/2 excludes the actor from candidates, so self-name resolves to nil → :not_found
       assert {:error, :not_found} = TestHarness.dispatch(player, Attack, ["Solo"])
     end
@@ -135,7 +136,7 @@ defmodule LineCore.CombatTest do
       Object.set_property(knife.id, "damage", 20)
 
       TestHarness.dispatch(attacker, Attack, ["Target"])
-      TestHarness.assert_msg(~r/You hit Target for 20 damage/)
+      TestHarness.assert_msg(~r/\[combat\] Target: -20 \(30 hp\)/)
     end
   end
 

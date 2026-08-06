@@ -31,7 +31,7 @@ defmodule LineCore.Object do
   end
 
   @doc "Fetch an object by id or raise."
-  def get!(id), do: get(id) || raise "object not found: #{id}"
+  def get!(id), do: get(id) || raise("object not found: #{id}")
 
   ## Properties
 
@@ -78,6 +78,18 @@ defmodule LineCore.Object do
 
   defp unwrap(%{"v" => v}), do: v
   defp unwrap(other), do: other
+
+  @doc "Get all properties whose key starts with the given prefix."
+  def properties_by_prefix(object_id, prefix) when is_binary(prefix) do
+    like_pattern = prefix <> "%"
+
+    from(p in Property,
+      where: p.object_id == ^object_id and like(p.key, ^like_pattern),
+      select: {p.key, p.value}
+    )
+    |> Repo.all()
+    |> Enum.map(fn {k, v} -> {k, unwrap(v)} end)
+  end
 
   ## Relationships
 
@@ -163,6 +175,57 @@ defmodule LineCore.Object do
     )
     |> Repo.one()
   end
+
+  ## Name search
+
+  @doc "Find the first object in a list whose name matches (case-insensitive exact or substring)."
+  def find_by_name(objects, name) do
+    name_down = String.downcase(name)
+
+    Enum.find(objects, fn o ->
+      String.contains?(String.downcase(o.name), name_down)
+    end)
+  end
+
+  ## Equipment / relationship queries
+
+  @doc "All objects related FROM owner_id by the given relationship type."
+  def related_by(owner_id, rel_type) when is_atom(rel_type) do
+    from(o in Object,
+      join: r in Relationship,
+      on: r.to_id == o.id,
+      where: r.from_id == ^owner_id and r.type == ^rel_type and is_nil(o.deleted_at)
+    )
+    |> Repo.all()
+  end
+
+  @doc "All wielded and worn objects. Returns [{rel_type, object}]."
+  def equipped(owner_id) do
+    from(o in Object,
+      join: r in Relationship,
+      on: r.to_id == o.id,
+      where:
+        r.from_id == ^owner_id and
+          r.type in [:wields_main, :wields_off, :wears] and
+          is_nil(o.deleted_at),
+      select: {r.type, o}
+    )
+    |> Repo.all()
+  end
+
+  @doc "Find a player by name (case-insensitive). Returns the object or nil."
+  def find_player_by_name(name) when is_binary(name) do
+    normalized = String.downcase(String.trim(name))
+
+    from(o in Object,
+      where: o.type == :player and is_nil(o.deleted_at),
+      where: fragment("lower(?) = ?", o.name, ^normalized),
+      limit: 1
+    )
+    |> Repo.one()
+  end
+
+  ## Direction canonicalization
 
   @directions %{
     "n" => "north",

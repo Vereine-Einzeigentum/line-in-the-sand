@@ -108,24 +108,54 @@ defmodule LineCore.ParserTest do
     end
   end
 
-  describe "parse/1 — desc verb structure" do
-    test "desc me as <description>" do
+  describe "parse/1 — @desc verb structure" do
+    test "@desc me as <description>" do
       assert {:ok, Verbs.Desc, ["scarred and quiet"]} =
-               Parser.parse("desc me as scarred and quiet")
+               Parser.parse("@desc me as scarred and quiet")
     end
 
-    test "describe me as <description>" do
-      assert {:ok, Verbs.Desc, ["tall, wired"]} =
-               Parser.parse("describe me as tall, wired")
+    test "@desc self as <description>" do
+      assert {:ok, Verbs.Desc, ["weary"]} = Parser.parse("@desc self as weary")
     end
 
-    test "desc self as <description>" do
-      assert {:ok, Verbs.Desc, ["weary"]} = Parser.parse("desc self as weary")
-    end
-
-    test "desc <object> as <description>" do
+    test "@desc <object> as <description>" do
       assert {:ok, Verbs.Desc, ["knife", "a dented blade"]} =
-               Parser.parse("desc knife as a dented blade")
+               Parser.parse("@desc knife as a dented blade")
+    end
+
+    test "bare desc is unknown" do
+      assert {:unknown, "desc", _} = Parser.parse("desc me as test")
+    end
+  end
+
+  describe "parse/1 — @bare verb structure" do
+    test "@bare <part> as <description>" do
+      assert {:ok, Verbs.Bare, ["feet", "%P has tiny feet."]} =
+               Parser.parse("@bare feet as %P has tiny feet.")
+    end
+
+    test "@bare without as gives single arg" do
+      assert {:ok, Verbs.Bare, ["feet"]} = Parser.parse("@bare feet")
+    end
+
+    test "bare without @ prefix is unknown" do
+      assert {:unknown, "bare", _} = Parser.parse("bare feet as test")
+    end
+  end
+
+  describe "parse/1 — @gender verb structure" do
+    test "@gender me as <gender>" do
+      assert {:ok, Verbs.Gender, ["she"]} = Parser.parse("@gender me as she")
+      assert {:ok, Verbs.Gender, ["he"]} = Parser.parse("@gender me as he")
+      assert {:ok, Verbs.Gender, ["they"]} = Parser.parse("@gender me as they")
+    end
+
+    test "@gender without me as gives empty args" do
+      assert {:ok, Verbs.Gender, []} = Parser.parse("@gender")
+    end
+
+    test "gender without @ prefix is unknown" do
+      assert {:unknown, "gender", _} = Parser.parse("gender me as she")
     end
   end
 

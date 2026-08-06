@@ -1,6 +1,9 @@
 defmodule LineWebWeb.Endpoint do
   use Phoenix.Endpoint, otp_app: :line_web
 
+  @player_auth_salt "player auth"
+  def player_auth_salt, do: @player_auth_salt
+
   # The session will be stored in the cookie and signed,
   # this means its contents can be read but not tampered with.
   # Set :encryption_salt if you would also like to encrypt it.
@@ -11,7 +14,7 @@ defmodule LineWebWeb.Endpoint do
     same_site: "Lax"
   ]
 
-  socket "/socket", LineWebWeb.UserSocket,
+  socket "/socket", LineWebWeb.PlayerSocket,
     websocket: true,
     longpoll: false
 

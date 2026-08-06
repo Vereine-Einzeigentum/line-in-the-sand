@@ -35,8 +35,7 @@ defmodule LineCore.Parser do
     "txt" => Verbs.Text,
     "tell" => Verbs.Text,
     "who" => Verbs.Who,
-    "desc" => Verbs.Desc,
-    "describe" => Verbs.Desc,
+    "@desc" => Verbs.Desc,
     "attack" => Verbs.Attack,
     "kill" => Verbs.Attack,
     "k" => Verbs.Attack,
@@ -53,7 +52,14 @@ defmodule LineCore.Parser do
     "scrap" => Verbs.Scrap,
     "salvage" => Verbs.Scrap,
     "sell" => Verbs.Sell,
-    "fence" => Verbs.Sell
+    "fence" => Verbs.Sell,
+
+    # Body / identity
+    "@bare" => Verbs.Bare,
+    "@gender" => Verbs.Gender,
+
+    # System
+    "@password" => Verbs.Password
   }
 
   def parse(input) when is_binary(input) do
@@ -132,6 +138,27 @@ defmodule LineCore.Parser do
     case Regex.run(~r/^(.+?)\s+(?:to|at)\s+(.+)$/i, rest) do
       [_, item, target] -> [String.trim(item), String.trim(target)]
       _ -> [rest]
+    end
+  end
+
+  defp parse_args(Verbs.Bare, rest) do
+    case Regex.run(~r/^(.+?)\s+as\s+(.+)$/i, rest) do
+      [_, part, description] -> [part, description]
+      _ -> [rest]
+    end
+  end
+
+  defp parse_args(Verbs.Gender, rest) do
+    case Regex.run(~r/^me\s+as\s+(.+)$/i, rest) do
+      [_, gender] -> [gender]
+      _ -> []
+    end
+  end
+
+  defp parse_args(Verbs.Password, rest) do
+    case Regex.run(~r/^me\s+as\s+(.+)$/i, rest) do
+      [_, password] -> [password]
+      _ -> []
     end
   end
 

@@ -8,15 +8,18 @@ defmodule LineCore.Verbs.Inventory do
 
   @behaviour LineCore.Verb
 
-  alias LineCore.Repo
-  alias LineCore.Schemas.Relationship
-  import Ecto.Query
+  alias LineCore.Object
 
   @impl true
   def execute(ctx, []) do
-    items = list_items(ctx.actor.id)
-    wielded = list_relations(ctx.actor.id, [:wields_main, :wields_off])
-    worn = list_relations(ctx.actor.id, [:wears])
+    items =
+      ctx.actor.id
+      |> Object.contents()
+      |> Enum.filter(&(&1.type == :item))
+
+    equipped = Object.equipped(ctx.actor.id)
+    wielded = Enum.filter(equipped, fn {t, _} -> t in [:wields_main, :wields_off] end)
+    worn = Enum.filter(equipped, fn {t, _} -> t == :wears end)
 
     lines =
       cond do
@@ -36,22 +39,6 @@ defmodule LineCore.Verbs.Inventory do
 
   ## Helpers
 
-  defp list_items(actor_id) do
-    actor_id
-    |> LineCore.Object.contents()
-    |> Enum.filter(&(&1.type == :item))
-  end
-
-  defp list_relations(actor_id, types) do
-    from(o in LineCore.Schemas.Object,
-      join: r in Relationship,
-      on: r.to_id == o.id,
-      where: r.from_id == ^actor_id and r.type in ^types and is_nil(o.deleted_at),
-      select: {r.type, o.name}
-    )
-    |> Repo.all()
-  end
-
   defp carried_section([]), do: []
 
   defp carried_section(items) do
@@ -62,14 +49,14 @@ defmodule LineCore.Verbs.Inventory do
 
   defp wielded_section(items) do
     Enum.map(items, fn
-      {:wields_main, name} -> "Wielding in main hand: #{name}"
-      {:wields_off, name} -> "Wielding in off hand: #{name}"
+      {:wields_main, o} -> "Wielding in main hand: #{o.name}"
+      {:wields_off, o} -> "Wielding in off hand: #{o.name}"
     end)
   end
 
   defp worn_section([]), do: []
 
   defp worn_section(items) do
-    Enum.map(items, fn {:wears, name} -> "Wearing: #{name}" end)
+    Enum.map(items, fn {:wears, o} -> "Wearing: #{o.name}" end)
   end
 end

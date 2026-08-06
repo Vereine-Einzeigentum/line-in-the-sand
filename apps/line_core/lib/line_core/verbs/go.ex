@@ -4,12 +4,13 @@ defmodule LineCore.Verbs.Go do
 
   Resolves the direction against the room's exit relationships, moves the
   actor to the destination room, broadcasts departure to the old room and
-  arrival to the new room.
+  arrival to the new room. Renders the destination room automatically.
   """
 
   @behaviour LineCore.Verb
 
   alias LineCore.Object
+  alias LineCore.Verbs.Look
 
   @impl true
   def execute(_ctx, []) do
@@ -25,17 +26,13 @@ defmodule LineCore.Verbs.Go do
         canonical = Object.canonicalize_direction(direction)
         actor_name = ctx.actor.name
 
+        room_view = Look.room_description(dest_room, ctx.actor.id)
+
         {:ok,
          [
-           # Broadcast departure to old room (everyone except the mover)
            {:notify_room, "#{actor_name} leaves #{canonical}.", except: [ctx.actor.id]},
-
-           # Move the actor
            {:move, ctx.actor.id, dest_room.id, :contains},
-
-           # Notify the actor — they'll see the new room via a look downstream
-           # (post-move hook will fire a Look. For now, tell them where they are.)
-           {:notify_actor, "You walk #{canonical}."}
+           {:notify_actor, "You walk #{canonical}.\n\n" <> room_view}
          ]}
     end
   end

@@ -19,6 +19,9 @@ config :line_web, LineWebWeb.Endpoint,
   secret_key_base: "dGVzdCBzZWNyZXQga2V5IGJhc2UgZm9yIHRlc3RpbmcgcHVycG9zZXMgb25seQ==aabbcc",
   server: false
 
+# Swoosh: no-op in tests
+config :line_web, LineWeb.Mailer, adapter: Swoosh.Adapters.Test
+
 # Print only warnings and errors during test
 config :logger, level: :warning
 

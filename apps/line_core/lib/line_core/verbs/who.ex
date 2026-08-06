@@ -36,7 +36,7 @@ defmodule LineCore.Verbs.Who do
   end
 
   def execute(_ctx, [name]) do
-    target = find_player_by_name(name)
+    target = Object.find_player_by_name(name)
 
     line =
       cond do
@@ -54,23 +54,4 @@ defmodule LineCore.Verbs.Who do
   end
 
   def execute(_ctx, _args), do: {:error, :bad_args}
-
-  ## Helpers
-
-  defp find_player_by_name(name) do
-    import Ecto.Query
-    alias LineCore.{Repo}
-    alias LineCore.Schemas.Object
-
-    name_down = String.downcase(name)
-
-    from(o in Object,
-      where:
-        o.type == :player and
-          fragment("lower(?)", o.name) == ^name_down and
-          is_nil(o.deleted_at),
-      limit: 1
-    )
-    |> Repo.one()
-  end
 end

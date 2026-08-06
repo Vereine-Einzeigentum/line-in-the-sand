@@ -14,16 +14,11 @@ defmodule LineCore.Verbs.Drop do
   def execute(_ctx, []), do: {:error, :drop_what}
 
   def execute(ctx, [name]) do
-    name_down = String.downcase(name)
-
     candidate =
       ctx.actor.id
       |> Object.contents()
       |> Enum.filter(&(&1.type == :item))
-      |> Enum.find(fn item ->
-        item_name = String.downcase(item.name)
-        item_name == name_down or String.contains?(item_name, name_down)
-      end)
+      |> Object.find_by_name(name)
 
     case candidate do
       nil ->
@@ -34,8 +29,7 @@ defmodule LineCore.Verbs.Drop do
          [
            {:move, item.id, ctx.room.id, :contains},
            {:notify_actor, "You drop the #{item.name}."},
-           {:notify_room, "#{ctx.actor.name} drops a #{item.name}.",
-            except: [ctx.actor.id]}
+           {:notify_room, "#{ctx.actor.name} drops a #{item.name}.", except: [ctx.actor.id]}
          ]}
     end
   end

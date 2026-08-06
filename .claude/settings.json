@@ -9,6 +9,17 @@
           }
         ]
       }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "mcp__Claude_Code_Remote__send_later|CronCreate|ScheduleWakeup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"decision\":\"block\",\"reason\":\"No crons. No session links. Ever.\"}'"
+          }
+        ]
+      }
     ]
   }
 }

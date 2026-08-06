@@ -51,3 +51,9 @@ node_modules/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Sourcemaps
+*.js.map
+
+# Oculus browser output
+oculus-out/

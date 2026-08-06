@@ -19,7 +19,7 @@ defmodule LineCore.Renderer do
   Used by look/examine verbs and by room-entry rendering.
   """
 
-  alias LineCore.Object
+  alias LineCore.{Object, Pronouns}
 
   @wrap_width 78
 
@@ -32,6 +32,7 @@ defmodule LineCore.Renderer do
     [
       render_name(object),
       render_description(object),
+      render_bare_parts(object),
       render_attachments(object),
       render_location(object),
       render_state(object)
@@ -62,28 +63,29 @@ defmodule LineCore.Renderer do
     end
   end
 
+  defp render_bare_parts(%{id: id, type: type}) when type in [:player, :npc] do
+    pronoun_key = Object.get_property(id, "pronouns")
+
+    Object.properties_by_prefix(id, "bare:")
+    |> Enum.sort_by(fn {k, _v} -> k end)
+    |> Enum.flat_map(fn {_key, desc} ->
+      desc |> Pronouns.resolve(pronoun_key) |> word_wrap(@wrap_width)
+    end)
+  end
+
+  defp render_bare_parts(_), do: []
+
   defp render_attachments(%{id: id, type: :player}), do: wielded_and_worn(id)
   defp render_attachments(%{id: id, type: :npc}), do: wielded_and_worn(id)
   defp render_attachments(_), do: []
 
   defp wielded_and_worn(object_id) do
-    import Ecto.Query
-    alias LineCore.{Repo, Schemas.Relationship}
-
-    from(o in LineCore.Schemas.Object,
-      join: r in Relationship,
-      on: r.to_id == o.id,
-      where:
-        r.from_id == ^object_id and
-          r.type in [:wields_main, :wields_off, :wears] and
-          is_nil(o.deleted_at),
-      select: {r.type, o.name}
-    )
-    |> Repo.all()
+    object_id
+    |> Object.equipped()
     |> Enum.map(fn
-      {:wields_main, name} -> "Wielding #{name} in main hand."
-      {:wields_off, name} -> "Wielding #{name} in off hand."
-      {:wears, name} -> "Wearing #{name}."
+      {:wields_main, o} -> "Wielding #{o.name} in main hand."
+      {:wields_off, o} -> "Wielding #{o.name} in off hand."
+      {:wears, o} -> "Wearing #{o.name}."
     end)
   end
 

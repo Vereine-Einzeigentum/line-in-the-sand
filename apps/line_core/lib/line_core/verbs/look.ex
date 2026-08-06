@@ -12,19 +12,15 @@ defmodule LineCore.Verbs.Look do
 
   @impl true
   def execute(ctx, []) do
-    # Bare look: describe the room.
-    lines =
-      Renderer.render(ctx.room) ++
-        [""] ++
-        exits_line(ctx.room) ++
-        [""] ++
-        contents_lines(ctx)
-
-    {:ok, [{:notify_actor, Enum.join(lines, "\n")}]}
+    {:ok, [{:notify_actor, room_description(ctx.room, ctx.actor.id)}]}
   end
 
   def execute(ctx, [target_name]) do
-    case find_target(ctx, target_name) do
+    target =
+      Object.find_by_name(ctx.room_contents, target_name) ||
+        Object.find_by_name(Object.contents(ctx.actor.id), target_name)
+
+    case target do
       nil ->
         {:error, :not_found}
 
@@ -35,6 +31,21 @@ defmodule LineCore.Verbs.Look do
 
   def execute(_ctx, _args), do: {:error, :bad_args}
 
+  @doc "Render a full room view for the given viewer. Used by Go for auto-look."
+  def room_description(room, viewer_id) do
+    contents = Object.contents(room.id)
+    others = Enum.reject(contents, &(&1.id == viewer_id))
+
+    lines =
+      Renderer.render(room) ++
+        [""] ++
+        exits_line(room) ++
+        [""] ++
+        contents_lines(others)
+
+    Enum.join(lines, "\n")
+  end
+
   ## Helpers
 
   defp exits_line(room) do
@@ -44,37 +55,9 @@ defmodule LineCore.Verbs.Look do
     end
   end
 
-  defp contents_lines(ctx) do
-    others = Enum.reject(ctx.room_contents, &(&1.id == ctx.actor.id))
+  defp contents_lines([]), do: []
 
-    case others do
-      [] ->
-        []
-
-      objs ->
-        Enum.map(objs, fn o -> "You see: #{o.name}." end)
-    end
-  end
-
-  defp find_target(ctx, name) do
-    name_down = String.downcase(name)
-
-    # Search room contents first, then actor's inventory.
-    in_room =
-      Enum.find(ctx.room_contents, fn o ->
-        String.downcase(o.name) == name_down or
-          String.contains?(String.downcase(o.name), name_down)
-      end)
-
-    if in_room do
-      in_room
-    else
-      ctx.actor.id
-      |> Object.contents()
-      |> Enum.find(fn o ->
-        String.downcase(o.name) == name_down or
-          String.contains?(String.downcase(o.name), name_down)
-      end)
-    end
+  defp contents_lines(objs) do
+    Enum.map(objs, fn o -> "You see: #{o.name}." end)
   end
 end
