@@ -11,6 +11,7 @@ defmodule LineCore.Schemas.Relationship do
                       in metadata. One row per exit direction.
   - :owns           — from_id owns to_id (an account owns a player object,
                       an org owns a storefront, etc.)
+  - :has_verb       — from_id exposes a verb-object definition
   - :wields_main    — player wields item in main hand
   - :wields_off     — player wields item in off hand
   - :wears          — player wears armor/clothing
@@ -26,7 +27,7 @@ defmodule LineCore.Schemas.Relationship do
 
   alias LineCore.Schemas.Object
 
-  @relationship_types ~w(contains exit_to owns wields_main wields_off wears follows targeting)a
+  @relationship_types ~w(contains exit_to owns has_verb wields_main wields_off wears follows targeting)a
 
   @primary_key {:id, :binary_id, autogenerate: true}
   @foreign_key_type :binary_id
