@@ -62,8 +62,8 @@ defmodule LineWebWeb.AuthController do
               must_change = Object.get_property(player_id, "temp_password") == true
 
               json(conn, %{
-            token: token,
-            player_id: player_id,
+                token: token,
+                player_id: player_id,
                 must_change_password: must_change
               })
           end
