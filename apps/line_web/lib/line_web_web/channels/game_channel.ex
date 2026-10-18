@@ -93,7 +93,6 @@ defmodule LineWebWeb.GameChannel do
         {:reply, {:ok, %{status: "dispatched"}}, socket}
 
       {:error, reason} ->
-        push(socket, "error", %{reason: format_reason(reason)})
         {:reply, {:error, %{reason: format_reason(reason)}}, socket}
     end
   end
@@ -140,7 +139,8 @@ defmodule LineWebWeb.GameChannel do
   end
 
 
-  defp format_reason(:unknown_verb), do: "unknown verb"
+  defp format_reason(:unknown_verb), do: "Huh?"
+  defp format_reason(:no_such_exit), do: "You can't go that way."
   defp format_reason(:empty_command), do: "empty command"
   defp format_reason(reason) when is_atom(reason), do: to_string(reason)
   defp format_reason({tag, _detail}) when is_atom(tag), do: to_string(tag)
