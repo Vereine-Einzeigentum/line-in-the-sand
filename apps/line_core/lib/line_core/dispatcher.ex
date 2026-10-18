@@ -31,11 +31,15 @@ defmodule LineCore.Dispatcher do
   alias Ecto.Multi
 
   def dispatch(actor_id, verb_module, args, raw_command) do
+    dispatch_resolved(actor_id, verb_module, args, raw_command, nil, nil)
+  end
+
+  def dispatch_resolved(actor_id, verb_module, args, raw_command, dobj, iobj) do
     with {:ok, actor} <- fetch_actor(actor_id),
          {:ok, room} <- fetch_room(actor),
          contents = LineCore.Object.contents(room.id),
          :ok <- check_requirements(actor, verb_module),
-         context = build_context(actor, room, contents, raw_command),
+         context = build_context(actor, room, contents, raw_command, dobj, iobj),
          {:ok, events} <- verb_module.execute(context, args),
          {:ok, _result} <- apply_events(events, context) do
       broadcast_events(events, context)
@@ -57,11 +61,13 @@ defmodule LineCore.Dispatcher do
     end
   end
 
-  defp build_context(actor, room, contents, raw_command) do
+  defp build_context(actor, room, contents, raw_command, dobj, iobj) do
     %Context{
       actor: actor,
       room: room,
       room_contents: contents,
+      dobj: dobj,
+      iobj: iobj,
       command: raw_command,
       now: DateTime.utc_now()
     }
