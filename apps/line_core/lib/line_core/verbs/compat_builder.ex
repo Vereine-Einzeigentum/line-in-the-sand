@@ -103,7 +103,7 @@ end
 defmodule LineCore.Verbs.BuilderDig do
   @behaviour LineCore.Verb
 
-  alias LineCore.{Archetypes, Builder}
+  alias LineCore.{Archetypes, Builder, Object}
 
   @impl true
   def execute(ctx, [name]) do
@@ -121,7 +121,46 @@ defmodule LineCore.Verbs.BuilderDig do
     end
   end
 
+  def execute(ctx, [exit_spec, destination_name]) do
+    with :ok <- Builder.require(ctx.actor),
+         nil <- Object.resolve_exit(ctx.room.id, exit_spec),
+         destination when not is_nil(destination) <- Object.find_global_by_name(destination_name),
+         true <- room?(destination) do
+      canonical = Object.canonicalize_direction(exit_spec)
+      exit_parent = Archetypes.get(:exit)
+      ref = {:builder_exit, ctx.actor.id, ctx.room.id, canonical}
+
+      {:ok,
+       [
+         {:create_object, ref,
+          %{
+            type: :exit,
+            name: "#{canonical} exit to #{destination.name}",
+            parent_id: exit_parent.id
+          }},
+         {:set_property, {:created, ref}, "direction", canonical},
+         {:set_property, {:created, ref}, "destination_id", destination.id},
+         {:relate, ctx.room.id, {:created, ref}, :contains},
+         {:relate, ctx.actor.id, {:created, ref}, :owns},
+         {:relate, ctx.room.id, destination.id, :exit_to, %{"direction" => canonical}},
+         {:notify_actor, "Dug exit #{canonical} to #{destination.name}."}
+       ]}
+    else
+      %{} -> {:error, :exit_exists}
+      nil -> {:error, :destination_not_found}
+      false -> {:error, :destination_not_room}
+      {:error, _} = error -> error
+    end
+  end
+
   def execute(_ctx, _args), do: {:error, :bad_args}
+
+  defp room?(object) do
+    case Archetypes.get(:room) do
+      nil -> false
+      room -> object.id == room.id or Object.descendant_of?(object.id, room.id)
+    end
+  end
 end
 
 defmodule LineCore.Verbs.BuilderCount do
@@ -243,53 +282,4 @@ defmodule LineCore.Verbs.BuilderRecycle do
   end
 
   def execute(_ctx, _args), do: {:error, :bad_args}
-end
-
-
-defmodule LineCore.Verbs.BuilderOpen do
-  @behaviour LineCore.Verb
-
-  alias LineCore.{Archetypes, Builder, Object}
-
-  @impl true
-  def execute(ctx, [direction, destination_name]) do
-    with :ok <- Builder.require(ctx.actor),
-         nil <- Object.resolve_exit(ctx.room.id, direction),
-         destination when not is_nil(destination) <- Object.find_global_by_name(destination_name),
-         true <- room?(destination) do
-      canonical = Object.canonicalize_direction(direction)
-      exit_parent = Archetypes.get(:exit)
-      ref = {:builder_exit, ctx.actor.id, ctx.room.id, canonical}
-
-      {:ok,
-       [
-         {:create_object, ref,
-          %{
-            type: :exit,
-            name: "#{canonical} exit to #{destination.name}",
-            parent_id: exit_parent.id
-          }},
-         {:set_property, {:created, ref}, "direction", canonical},
-         {:set_property, {:created, ref}, "destination_id", destination.id},
-         {:relate, ctx.room.id, {:created, ref}, :contains},
-         {:relate, ctx.actor.id, {:created, ref}, :owns},
-         {:relate, ctx.room.id, destination.id, :exit_to, %{"direction" => canonical}},
-         {:notify_actor, "Opened #{canonical} to #{destination.name}."}
-       ]}
-    else
-      %{} -> {:error, :exit_exists}
-      nil -> {:error, :destination_not_found}
-      false -> {:error, :destination_not_room}
-      {:error, _} = error -> error
-    end
-  end
-
-  def execute(_ctx, _args), do: {:error, :bad_args}
-
-  defp room?(object) do
-    case Archetypes.get(:room) do
-      nil -> false
-      room -> object.id == room.id or Object.descendant_of?(object.id, room.id)
-    end
-  end
 end
