@@ -143,6 +143,7 @@ defmodule LineCore.CompatCommandsTest do
     assert :ok = CommandRouter.dispatch(ctx.player.id, ~s(whisper "quiet" to Bob))
     assert_receive {:msg, whisper}, 200
     assert whisper =~ "quiet"
+    TestHarness.drain()
 
     other = TestHarness.spawn_room("Other")
     {:ok, _} = Object.move(bob.id, other.id)
