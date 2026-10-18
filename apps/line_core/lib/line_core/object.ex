@@ -211,7 +211,8 @@ defmodule LineCore.Object do
     from(o in Object,
       join: r in Relationship,
       on: r.to_id == o.id,
-      where: r.from_id == ^container_id and r.type == :contains and is_nil(o.deleted_at)
+      where: r.from_id == ^container_id and r.type == :contains and is_nil(o.deleted_at),
+      order_by: [asc: o.inserted_at, asc: o.id]
     )
     |> Repo.all()
   end
@@ -288,13 +289,47 @@ defmodule LineCore.Object do
 
   ## Name search
 
-  @doc "Find the first object in a list whose name matches (case-insensitive exact or substring)."
-  def find_by_name(objects, name) do
-    name_down = String.downcase(name)
+  @doc """
+  Find an object by visible name.
 
-    Enum.find(objects, fn o ->
-      String.contains?(String.downcase(o.name), name_down)
-    end)
+  Exact case-insensitive names win over substring matches. A leading one-based
+  selector such as `1.bag` or `2.bag` selects among the ordered matches,
+  preserving ordinary MOO duplicate-name disambiguation.
+  """
+  def find_by_name(objects, name) do
+    {ordinal, query} = parse_match_selector(name)
+    normalized = String.downcase(query)
+
+    exact =
+      Enum.filter(objects, fn object ->
+        String.downcase(object.name) == normalized
+      end)
+
+    matches =
+      if exact == [] do
+        Enum.filter(objects, fn object ->
+          String.contains?(String.downcase(object.name), normalized)
+        end)
+      else
+        exact
+      end
+
+    Enum.at(matches, ordinal - 1)
+  end
+
+  defp parse_match_selector(name) do
+    trimmed = String.trim(name)
+
+    case Regex.run(~r/^(\d+)\.(.+)$/, trimmed) do
+      [_, ordinal, query] ->
+        case Integer.parse(ordinal) do
+          {n, ""} when n > 0 -> {n, String.trim(query)}
+          _ -> {1, trimmed}
+        end
+
+      _ ->
+        {1, trimmed}
+    end
   end
 
   ## Equipment / relationship queries
