@@ -17,9 +17,31 @@ defmodule LineCore.Object do
 
   @doc "Create an object of the given type with the given name."
   def create(type, name, attrs \\ %{}) do
+    attrs = maybe_default_parent(type, name, attrs)
+
     %Object{}
     |> Object.changeset(Map.merge(%{type: type, name: name}, attrs))
     |> Repo.insert()
+  end
+
+  defp maybe_default_parent(_type, name, attrs) when is_binary(name) do
+    has_parent =
+      Map.has_key?(attrs, :parent_id) or
+        Map.has_key?(attrs, "parent_id")
+
+    cond do
+      has_parent ->
+        attrs
+
+      String.starts_with?(name, "$") ->
+        attrs
+
+      true ->
+        case LineCore.Archetypes.default_parent_id(Map.get(attrs, :type) || Map.get(attrs, "type")) do
+          nil -> attrs
+          parent_id -> Map.put(attrs, :parent_id, parent_id)
+        end
+    end
   end
 
   ## Read
