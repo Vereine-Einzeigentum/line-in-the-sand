@@ -47,6 +47,32 @@ defmodule LineCore.BootstrapAdminTest do
     refute Bcrypt.verify_pass("replacement-secret", current_hash)
   end
 
+  test "places a newly bootstrapped admin in the requested starting room" do
+    {:ok, room} = Object.create(:room, "Bootstrap Safehouse")
+
+    assert {:ok, {:created, admin}} =
+             BootstrapAdmin.ensure("admin", "initial-secret", starting_room_id: room.id)
+
+    assert %{id: room_id} = Object.container_of(admin.id)
+    assert room_id == room.id
+  end
+
+  test "does not teleport an existing admin on a later bootstrap" do
+    {:ok, first_room} = Object.create(:room, "First Room")
+    {:ok, second_room} = Object.create(:room, "Second Room")
+
+    assert {:ok, {:created, admin}} =
+             BootstrapAdmin.ensure("admin", "initial-secret", starting_room_id: first_room.id)
+
+    assert {:ok, _} = Object.move(admin.id, second_room.id)
+
+    assert {:ok, {:existing, _admin}} =
+             BootstrapAdmin.ensure("admin", "replacement-secret", starting_room_id: first_room.id)
+
+    assert %{id: room_id} = Object.container_of(admin.id)
+    assert room_id == second_room.id
+  end
+
   test "bootstrap_from_env skips cleanly when bootstrap credentials are absent" do
     old_name = System.get_env("ADMIN_BOOTSTRAP_NAME")
     old_password = System.get_env("ADMIN_BOOTSTRAP_PASSWORD")
