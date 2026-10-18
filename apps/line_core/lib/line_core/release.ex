@@ -14,6 +14,31 @@ defmodule LineCore.Release do
     end
   end
 
+  def bootstrap_admin do
+    load_app()
+
+    for repo <- repos() do
+      {:ok, result, _} =
+        Ecto.Migrator.with_repo(repo, fn _repo ->
+          LineCore.BootstrapAdmin.bootstrap_from_env()
+        end)
+
+      case result do
+        :skip ->
+          IO.puts("Admin bootstrap skipped: credentials not configured")
+
+        {:ok, {:created, admin}} ->
+          IO.puts("Admin bootstrap created #{admin.name}")
+
+        {:ok, {:existing, admin}} ->
+          IO.puts("Admin bootstrap found existing #{admin.name}")
+
+        {:error, reason} ->
+          raise "Admin bootstrap failed: #{inspect(reason)}"
+      end
+    end
+  end
+
   def rollback(repo, version) do
     load_app()
 
