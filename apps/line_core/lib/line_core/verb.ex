@@ -53,6 +53,7 @@ defmodule LineCore.Verb do
           | {:unrelate, from_id :: binary(), to_id :: binary(), rel_type :: atom()}
           | {:create_object, ref :: term(), attrs :: map()}
           | {:create_object, attrs :: map()}
+          | {:update_object, object_id :: binary(), attrs :: map()}
           | {:delete_object, object_id :: binary()}
           | {:notify_actor, message :: String.t()}
           | {:notify_room, message :: String.t(), opts :: keyword()}
