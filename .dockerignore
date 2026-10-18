@@ -1,0 +1,6 @@
+_build
+deps
+.git
+.github
+apps/line_web/assets/node_modules
+apps/line_web/priv/static/assets
