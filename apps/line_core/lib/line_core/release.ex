@@ -27,7 +27,8 @@ defmodule LineCore.Release do
       {:ok, {_world, admin_result}, _} =
         Ecto.Migrator.with_repo(repo, fn _repo ->
           archetypes = LineCore.Archetypes.seed()
-          world = LineCore.Seed.DistrictOne.seed()
+          :ok = LineCore.Archetypes.normalize_legacy_item_parents(archetypes)
+          world = LineCore.Seed.DistrictOne.seed(archetypes)
           {:ok, adminland} = LineCore.Adminland.ensure()
 
           admin_result =
