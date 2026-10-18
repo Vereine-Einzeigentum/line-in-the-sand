@@ -56,7 +56,7 @@ defmodule LineWebWeb.PlaytestController do
         })
 
       {:error, reason} ->
-        conn |> put_status(:bad_request) |> json(%{error: inspect(reason)})
+        conn |> put_status(:bad_request) |> json(%{error: command_error(reason)})
     end
   end
 
@@ -155,6 +155,10 @@ defmodule LineWebWeb.PlaytestController do
         conn |> put_status(:bad_request) |> json(%{error: inspect(reason)})
     end
   end
+
+  defp command_error(:unknown_verb), do: "unknown verb"
+  defp command_error(:empty_command), do: "empty command"
+  defp command_error(reason), do: inspect(reason)
 
   defp default_starting_room do
     case System.get_env("PLAYTEST_STARTING_ROOM_ID") do
