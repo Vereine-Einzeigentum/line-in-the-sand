@@ -82,7 +82,7 @@ defmodule LineCore.Combat do
   is a normal persistent `$corpse -> $container` object. The corpse has no
   special loot table: former inventory and equipment are simply its contents.
   """
-  def death_events(victim_id, opts \ []) do
+  def death_events(victim_id, opts \\ []) do
     safehouse_id = opts[:safehouse_id] || safehouse_room_id()
     penalty = opts[:dirham_penalty] || @default_dirham_penalty
     {_current, max_hp} = hp(victim_id)
