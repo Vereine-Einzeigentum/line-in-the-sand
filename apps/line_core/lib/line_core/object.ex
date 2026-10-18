@@ -24,7 +24,7 @@ defmodule LineCore.Object do
     |> Repo.insert()
   end
 
-  defp maybe_default_parent(_type, name, attrs) when is_binary(name) do
+  defp maybe_default_parent(type, name, attrs) when is_binary(name) do
     has_parent =
       Map.has_key?(attrs, :parent_id) or
         Map.has_key?(attrs, "parent_id")
@@ -37,7 +37,7 @@ defmodule LineCore.Object do
         attrs
 
       true ->
-        case LineCore.Archetypes.default_parent_id(Map.get(attrs, :type) || Map.get(attrs, "type")) do
+        case LineCore.Archetypes.default_parent_id(type) do
           nil -> attrs
           parent_id -> Map.put(attrs, :parent_id, parent_id)
         end
