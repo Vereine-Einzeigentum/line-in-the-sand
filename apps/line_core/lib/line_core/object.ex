@@ -170,6 +170,15 @@ defmodule LineCore.Object do
     Enum.any?(ancestors(object_id), &(&1.id == ancestor_id))
   end
 
+  @doc "Direct inheritance children, oldest first."
+  def children(parent_id) do
+    from(o in Object,
+      where: o.parent_id == ^parent_id and is_nil(o.deleted_at),
+      order_by: [asc: o.inserted_at, asc: o.id]
+    )
+    |> Repo.all()
+  end
+
   ## Relationships
 
   @doc "Create a relationship between two objects."
@@ -342,6 +351,14 @@ defmodule LineCore.Object do
       where: r.from_id == ^owner_id and r.type == ^rel_type and is_nil(o.deleted_at)
     )
     |> Repo.all()
+  end
+
+  @doc "Objects owned by owner_id through the ordinary :owns relation."
+  def owned(owner_id), do: related_by(owner_id, :owns)
+
+  @doc "True when owner_id owns object_id."
+  def owns?(owner_id, object_id) do
+    Enum.any?(owned(owner_id), &(&1.id == object_id))
   end
 
   @doc "All wielded and worn objects. Returns [{rel_type, object}]."
