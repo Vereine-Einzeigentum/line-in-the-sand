@@ -68,7 +68,7 @@ defmodule LineWebWeb.GameChannelTest do
 
     ref = push(socket, "command", %{"raw" => "blarg"})
     assert_reply ref, :error, %{reason: reason}
-    assert reason =~ "unknown verb"
+    assert reason == "Huh?"
   end
 
   test "empty raw returns error" do
