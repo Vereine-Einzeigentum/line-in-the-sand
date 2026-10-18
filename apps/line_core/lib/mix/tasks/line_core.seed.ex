@@ -16,8 +16,12 @@ defmodule Mix.Tasks.LineCore.Seed do
   def run(_args) do
     Mix.Task.run("app.start")
 
+    IO.puts("Seeding object archetypes...")
+    archetypes = LineCore.Archetypes.seed()
+    :ok = LineCore.Archetypes.normalize_legacy_item_parents(archetypes)
+
     IO.puts("Seeding District One...")
-    result = LineCore.Seed.DistrictOne.seed()
+    result = LineCore.Seed.DistrictOne.seed(archetypes)
 
     IO.puts("")
     IO.puts("=== Seed complete ===")
