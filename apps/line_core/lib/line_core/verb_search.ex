@@ -25,8 +25,8 @@ defmodule LineCore.VerbSearch do
         now: DateTime.utc_now()
       }
 
-      dobj = resolve_object(base_context, command.dobjstr)
       iobj = resolve_object(base_context, command.iobjstr)
+      dobj = resolve_direct_object(base_context, command, iobj)
       context = %{base_context | dobj: dobj, iobj: iobj}
 
       origins =
@@ -100,6 +100,17 @@ defmodule LineCore.VerbSearch do
   defp prep_matches?("any", _prep), do: true
   defp prep_matches?("none", prep), do: is_nil(prep)
   defp prep_matches?(expected, prep), do: expected == prep
+
+  defp resolve_direct_object(_context, %{dobjstr: nil}, _iobj), do: nil
+
+  defp resolve_direct_object(context, command, iobj) do
+    nested =
+      if command.prepstr == "from" and iobj do
+        Resolver.within(iobj, command.dobjstr)
+      end
+
+    nested || Resolver.visible(context, command.dobjstr)
+  end
 
   defp resolve_object(_context, nil), do: nil
   defp resolve_object(context, text), do: Resolver.visible(context, text)
