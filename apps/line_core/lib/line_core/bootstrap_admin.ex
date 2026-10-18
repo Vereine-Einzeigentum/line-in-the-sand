@@ -17,7 +17,7 @@ defmodule LineCore.BootstrapAdmin do
   @admin_key "admin"
 
   @spec ensure(binary(), binary(), keyword()) ::
-          {:ok, {:created | :existing, LineCore.Schemas.Object.t()}} | {:error, term()}
+          {:ok, {:created | :existing, struct()}} | {:error, term()}
   def ensure(name, password, opts \\ [])
       when is_binary(name) and is_binary(password) and is_list(opts) do
     name = String.trim(name)
@@ -55,7 +55,7 @@ defmodule LineCore.BootstrapAdmin do
   Optional:
     * ADMIN_BOOTSTRAP_EMAIL
   """
-  @spec bootstrap_from_env() :: :skip | {:ok, {:created | :existing, LineCore.Schemas.Object.t()}}
+  @spec bootstrap_from_env() :: :skip | {:ok, {:created | :existing, struct()}}
   def bootstrap_from_env do
     name = System.get_env("ADMIN_BOOTSTRAP_NAME") |> normalize_optional()
     password = System.get_env("ADMIN_BOOTSTRAP_PASSWORD") |> normalize_optional()
