@@ -42,12 +42,7 @@ defmodule LineWebWeb.PlayerChannel do
         {:reply, :ok, socket}
 
       {:error, reason} ->
-        push(socket, "system", %{
-          text: error_text(reason),
-          kind: "error"
-        })
-
-        {:reply, {:error, %{reason: inspect(reason)}}, socket}
+        {:reply, {:error, %{reason: error_text(reason)}}, socket}
     end
   end
 
@@ -92,6 +87,7 @@ defmodule LineWebWeb.PlayerChannel do
   defp error_text(:actor_not_found), do: "You don't seem to exist."
   defp error_text(:actor_not_in_room), do: "You're nowhere."
   defp error_text(:no_exit), do: "You can't go that way."
+  defp error_text(:no_such_exit), do: "You can't go that way."
   defp error_text(:not_here), do: "You don't see that here."
   defp error_text(:unknown_verb), do: "Huh?"
   defp error_text(:empty_command), do: ""
