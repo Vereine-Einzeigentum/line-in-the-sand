@@ -43,12 +43,15 @@ defmodule LineCore.Verb do
   @typedoc """
   Events that a verb can produce. Applied by the dispatcher in order.
   """
+  @type object_ref :: binary() | {:created, term()}
+
   @type event ::
-          {:set_property, object_id :: binary(), key :: String.t(), value :: term()}
+          {:set_property, object_ref(), key :: String.t(), value :: term()}
           | {:delete_property, object_id :: binary(), key :: String.t()}
-          | {:move, object_id :: binary(), to_container_id :: binary(), rel_type :: atom()}
-          | {:relate, from_id :: binary(), to_id :: binary(), rel_type :: atom()}
+          | {:move, object_ref(), to_container :: object_ref(), rel_type :: atom()}
+          | {:relate, from :: object_ref(), to :: object_ref(), rel_type :: atom()}
           | {:unrelate, from_id :: binary(), to_id :: binary(), rel_type :: atom()}
+          | {:create_object, ref :: term(), attrs :: map()}
           | {:create_object, attrs :: map()}
           | {:delete_object, object_id :: binary()}
           | {:notify_actor, message :: String.t()}
