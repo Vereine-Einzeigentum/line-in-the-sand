@@ -12,17 +12,32 @@ defmodule LineCore.Parser do
   @directions ~w(n north s south e east w west u up d down ne northeast nw northwest se southeast sw southwest in out)
 
   @system_map %{
+    "help" => Verbs.Help,
+    "info" => Verbs.Help,
+    "information" => Verbs.Help,
+    "?" => Verbs.Help,
     "text" => Verbs.Text,
     "txt" => Verbs.Text,
     "tell" => Verbs.Text,
+    "page" => Verbs.Page,
+    "whereis" => Verbs.WhereIs,
     "who" => Verbs.Who,
+    "@who" => Verbs.Who,
     "@desc" => Verbs.Desc,
+    "@describe" => Verbs.Desc,
+    "@rename" => Verbs.Rename,
+    "@create" => Verbs.BuilderCreate,
+    "@dig" => Verbs.BuilderDig,
+    "@count" => Verbs.BuilderCount,
+    "@audit" => Verbs.BuilderAudit,
+    "@classes" => Verbs.BuilderClasses,
+    "@quota" => Verbs.BuilderQuota,
+    "@move" => Verbs.BuilderMove,
+    "@recycle" => Verbs.BuilderRecycle,
     "@bare" => Verbs.Bare,
     "@gender" => Verbs.Gender,
     "@password" => Verbs.Password
   }
-
-  @prepositions ~w(to at in on with from into onto)
 
   def parse(input) when is_binary(input) do
     trimmed = String.trim(input)
@@ -179,14 +194,26 @@ defmodule LineCore.Parser do
   defp split_preposition(""), do: nil
 
   defp split_preposition(rest) do
-    pattern = ~r/^(.+?)\s+(to|at|in|on|with|from|into|onto)\s+(.+)$/i
+    pattern =
+      ~r/^(.+?)\s+(to|at|in|inside|into|on|onto|upon|with|using|from|out of|from inside|off|off of)\s+(.+)$/i
 
     case Regex.run(pattern, rest) do
       [_, dobj, prep, iobj] ->
-        {String.trim(dobj), String.downcase(prep), String.trim(iobj)}
+        {String.trim(dobj), canonical_prep(prep), String.trim(iobj)}
 
       _ ->
         nil
+    end
+  end
+
+  defp canonical_prep(prep) do
+    case String.downcase(prep) do
+      p when p in ["inside", "into", "in"] -> "in"
+      p when p in ["onto", "upon", "on"] -> "on"
+      p when p in ["using", "with"] -> "with"
+      p when p in ["out of", "from inside", "from"] -> "from"
+      p when p in ["off of", "off"] -> "off"
+      other -> other
     end
   end
 
@@ -209,8 +236,9 @@ defmodule LineCore.Parser do
 
   defp parse_system_args(_module, ""), do: []
 
-  defp parse_system_args(Verbs.Text, rest) do
-    case String.split(rest, " ", parts: 2) do
+  defp parse_system_args(module, rest) when module in [Verbs.Text, Verbs.Page] do
+    case String.split(rest, ~r/\s+/, parts: 2, trim: true) do
+      [] -> []
       [target] -> [target]
       [target, message] -> [target, message]
     end
@@ -226,6 +254,29 @@ defmodule LineCore.Parser do
   end
 
   defp parse_system_args(Verbs.Who, rest), do: [rest]
+
+  defp parse_system_args(Verbs.Rename, rest) do
+    case Regex.run(~r/^(.+?)\s+to\s+(.+)$/i, rest) do
+      [_, object, name] -> [String.trim(object), strip_quotes(name)]
+      _ -> [rest]
+    end
+  end
+
+  defp parse_system_args(Verbs.BuilderCreate, rest) do
+    case Regex.run(~r/^(\S+)\s+named\s+(.+)$/i, rest) do
+      [_, parent, name] -> [String.downcase(parent), strip_quotes(name)]
+      _ -> [rest]
+    end
+  end
+
+  defp parse_system_args(Verbs.BuilderMove, rest) do
+    case Regex.run(~r/^(.+?)\s+to\s+(.+)$/i, rest) do
+      [_, object, destination] -> [String.trim(object), String.trim(destination)]
+      _ -> [rest]
+    end
+  end
+
+  defp parse_system_args(Verbs.BuilderDig, rest), do: [strip_quotes(rest)]
 
   defp parse_system_args(Verbs.Bare, rest) do
     case Regex.run(~r/^(.+?)\s+as\s+(.+)$/i, rest) do
@@ -249,6 +300,13 @@ defmodule LineCore.Parser do
   end
 
   defp parse_system_args(_module, rest), do: [rest]
+
+  defp strip_quotes(value) do
+    value
+    |> String.trim()
+    |> String.trim_leading(~s("))
+    |> String.trim_trailing(~s("))
+  end
 
   defp blank_to_nil(value) do
     case String.trim(value) do
