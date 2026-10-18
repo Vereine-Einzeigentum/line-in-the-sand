@@ -73,11 +73,28 @@ defmodule LineCore.Parser do
         message = String.trim_leading(trimmed, "\"") |> String.trim()
         {:ok, Verbs.Say, [message]}
 
+      String.starts_with?(trimmed, ":") ->
+        pose = String.trim_leading(trimmed, ":") |> String.trim()
+        {:ok, Verbs.Emote, [pose]}
+
+      String.starts_with?(trimmed, ".") ->
+        parse_social(trimmed)
+
       String.downcase(trimmed) in @directions ->
         {:ok, Verbs.Go, [String.downcase(trimmed)]}
 
       true ->
         parse_verb(trimmed)
+    end
+  end
+
+  defp parse_social(input) do
+    body = input |> String.trim_leading(".") |> String.trim()
+
+    case String.split(body, ~r/\s+/, parts: 2, trim: true) do
+      [] -> {:ok, Verbs.Social, []}
+      [name] -> {:ok, Verbs.Social, [String.downcase(name)]}
+      [name, target] -> {:ok, Verbs.Social, [String.downcase(name), String.trim(target)]}
     end
   end
 
@@ -165,5 +182,8 @@ defmodule LineCore.Parser do
   defp parse_args(_module, rest), do: [rest]
 
   def verb_map, do: @verb_map
-  def known_verbs, do: @verb_map |> Map.values() |> Enum.uniq()
+  def known_verbs do
+    (@verb_map |> Map.values()) ++ [Verbs.Emote, Verbs.Social]
+    |> Enum.uniq()
+  end
 end
