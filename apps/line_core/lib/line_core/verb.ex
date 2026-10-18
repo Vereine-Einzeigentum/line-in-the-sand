@@ -50,6 +50,7 @@ defmodule LineCore.Verb do
           | {:delete_property, object_id :: binary(), key :: String.t()}
           | {:move, object_ref(), to_container :: object_ref(), rel_type :: atom()}
           | {:relate, from :: object_ref(), to :: object_ref(), rel_type :: atom()}
+          | {:relate, from :: object_ref(), to :: object_ref(), rel_type :: atom(), metadata :: map()}
           | {:unrelate, from_id :: binary(), to_id :: binary(), rel_type :: atom()}
           | {:create_object, ref :: term(), attrs :: map()}
           | {:create_object, attrs :: map()}
