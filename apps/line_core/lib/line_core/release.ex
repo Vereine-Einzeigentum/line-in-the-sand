@@ -27,11 +27,20 @@ defmodule LineCore.Release do
       {:ok, {_world, admin_result}, _} =
         Ecto.Migrator.with_repo(repo, fn _repo ->
           world = LineCore.Seed.DistrictOne.seed()
+          {:ok, adminland} = LineCore.Adminland.ensure()
 
           admin_result =
             LineCore.BootstrapAdmin.bootstrap_from_env(
-              starting_room_id: world.safehouse.id
+              starting_room_id: adminland.id
             )
+
+          case admin_result do
+            {:ok, {_state, admin}} ->
+              {:ok, _room} = LineCore.Adminland.load_if_admin(admin.id)
+
+            :skip ->
+              :ok
+          end
 
           {world, admin_result}
         end)
@@ -41,7 +50,7 @@ defmodule LineCore.Release do
           IO.puts("Admin bootstrap skipped: credentials not configured")
 
         {:ok, {:created, admin}} ->
-          IO.puts("Admin bootstrap created #{admin.name} in District One")
+          IO.puts("Admin bootstrap created #{admin.name} in Adminland")
 
         {:ok, {:existing, admin}} ->
           IO.puts("Admin bootstrap found existing #{admin.name}")
