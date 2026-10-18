@@ -181,7 +181,19 @@ defmodule LineCore.Dispatcher do
     end
   end
 
-  defp apply_event_to_multi(multi, {:relate, from_ref, to_ref, rel_type}, _ctx) do
+  defp apply_event_to_multi(multi, {:relate, from_ref, to_ref, rel_type}, ctx) do
+    apply_event_to_multi(multi, {:relate, from_ref, to_ref, rel_type, %{}}, ctx)
+  end
+
+  defp apply_event_to_multi(
+         multi,
+         {:relate, from_ref, to_ref, rel_type, metadata},
+         _ctx
+       ) do
+    attrs = fn from_id, to_id ->
+      %{from_id: from_id, to_id: to_id, type: rel_type, metadata: metadata}
+    end
+
     if created_ref?(from_ref) or created_ref?(to_ref) do
       Multi.run(
         multi,
@@ -191,7 +203,7 @@ defmodule LineCore.Dispatcher do
           to_id = resolve_object_ref!(to_ref, changes)
 
           %Relationship{}
-          |> Relationship.changeset(%{from_id: from_id, to_id: to_id, type: rel_type})
+          |> Relationship.changeset(attrs.(from_id, to_id))
           |> repo.insert()
         end
       )
@@ -200,7 +212,7 @@ defmodule LineCore.Dispatcher do
         multi,
         {:relate, from_ref, to_ref, rel_type, make_ref()},
         %Relationship{}
-        |> Relationship.changeset(%{from_id: from_ref, to_id: to_ref, type: rel_type})
+        |> Relationship.changeset(attrs.(from_ref, to_ref))
       )
     end
   end
