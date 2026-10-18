@@ -11,6 +11,8 @@ defmodule LineCore.Archetypes do
   alias LineCore.{Object, Repo, VerbStore}
   alias LineCore.Schemas.Object, as: ObjSchema
 
+  @legacy_item_parent_marker "migration:item_parent_v1"
+
   @names %{
     root: "$root",
     room: "$room",
@@ -21,7 +23,12 @@ defmodule LineCore.Archetypes do
     npc: "$npc",
     mod: "$mod",
     immobile: "$immobile",
+    item: "$item",
+    container: "$container",
+    corpse: "$corpse",
     wieldable: "$wieldable",
+    weapon: "$weapon",
+    clothing: "$clothing",
     skill: "$skill",
     verb: "$verb"
   }
@@ -30,13 +37,22 @@ defmodule LineCore.Archetypes do
     root = ensure!(:root, nil)
     room = ensure!(:room, root.id)
     exit = ensure!(:exit, root.id)
+
     motile = ensure!(:motile, root.id)
     mob = ensure!(:mob, motile.id)
     pc = ensure!(:pc, mob.id)
     npc = ensure!(:npc, mob.id)
     mod = ensure!(:mod, motile.id)
+
     immobile = ensure!(:immobile, root.id)
-    wieldable = ensure!(:wieldable, root.id)
+
+    item = ensure!(:item, root.id)
+    container = ensure!(:container, item.id)
+    corpse = ensure!(:corpse, container.id)
+    wieldable = ensure!(:wieldable, item.id)
+    weapon = ensure!(:weapon, wieldable.id)
+    clothing = ensure!(:clothing, item.id)
+
     skill = ensure!(:skill, root.id)
     verb = ensure!(:verb, root.id)
 
@@ -50,7 +66,12 @@ defmodule LineCore.Archetypes do
       npc: npc,
       mod: mod,
       immobile: immobile,
+      item: item,
+      container: container,
+      corpse: corpse,
       wieldable: wieldable,
+      weapon: weapon,
+      clothing: clothing,
       skill: skill,
       verb: verb
     }
@@ -59,7 +80,7 @@ defmodule LineCore.Archetypes do
     tree
   end
 
-  def adopt_existing(tree \\ seed()) do
+  def adopt_existing(tree \ seed()) do
     from(o in ObjSchema, where: is_nil(o.deleted_at))
     |> Repo.all()
     |> Enum.each(fn object ->
@@ -87,6 +108,34 @@ defmodule LineCore.Archetypes do
     :ok
   end
 
+  @doc """
+  One-time alpha data migration for objects created while every :item defaulted
+  directly to $wieldable.
+
+  Once complete, the root marker prevents later explicitly-wieldable objects
+  from being demoted on subsequent deploys.
+  """
+  def normalize_legacy_item_parents(tree \ seed()) do
+    if Object.get_local_property(tree.root.id, @legacy_item_parent_marker) == true do
+      :ok
+    else
+      from(o in ObjSchema,
+        where:
+          o.type == :item and
+            o.parent_id == ^tree.wieldable.id and
+            is_nil(o.deleted_at) and
+            not like(o.name, "$%")
+      )
+      |> Repo.all()
+      |> Enum.each(&set_parent!(&1, tree.item.id))
+
+      {:ok, _} =
+        Object.set_property(tree.root.id, @legacy_item_parent_marker, true)
+
+      :ok
+    end
+  end
+
   def default_parent_id(type) do
     key =
       case type do
@@ -94,7 +143,7 @@ defmodule LineCore.Archetypes do
         :exit -> :exit
         :player -> :pc
         :npc -> :npc
-        :item -> :wieldable
+        :item -> :item
         _ -> nil
       end
 
@@ -164,7 +213,7 @@ defmodule LineCore.Archetypes do
         tree.npc.id
 
       :item ->
-        tree.wieldable.id
+        tree.item.id
 
       _ ->
         nil
@@ -181,8 +230,8 @@ defmodule LineCore.Archetypes do
       {tree.room, %{name: "go", aliases: ["move"], module: "go", dobj: "none", prep: "none", iobj: "none", arg_mode: "rest"}},
       {tree.motile, %{name: "inventory", aliases: ["inv", "i"], module: "inventory", dobj: "none", prep: "none", iobj: "none", arg_mode: "none"}},
       {tree.mob, %{name: "attack", aliases: ["kill", "k", "hit", "stab", "slash", "shoot", "punch"], module: "attack", dobj: "this", prep: "any", iobj: "any", arg_mode: "target_required"}},
+      {tree.item, %{name: "scrap", aliases: ["salvage"], module: "scrap", dobj: "this", prep: "none", iobj: "none", arg_mode: "target_required"}},
       {tree.wieldable, %{name: "wield", aliases: ["hold", "equip"], module: "wield", dobj: "this", prep: "none", iobj: "none", arg_mode: "wield"}},
-      {tree.wieldable, %{name: "scrap", aliases: ["salvage"], module: "scrap", dobj: "this", prep: "none", iobj: "none", arg_mode: "target_required"}},
       {tree.npc, %{name: "sell", aliases: ["fence"], module: "sell", dobj: "any", prep: "any", iobj: "this", arg_mode: "sell"}}
     ]
 
