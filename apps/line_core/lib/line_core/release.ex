@@ -26,6 +26,7 @@ defmodule LineCore.Release do
     for repo <- repos() do
       {:ok, {_world, admin_result}, _} =
         Ecto.Migrator.with_repo(repo, fn _repo ->
+          archetypes = LineCore.Archetypes.seed()
           world = LineCore.Seed.DistrictOne.seed()
           {:ok, adminland} = LineCore.Adminland.ensure()
 
@@ -41,6 +42,8 @@ defmodule LineCore.Release do
             :skip ->
               :ok
           end
+
+          :ok = LineCore.Archetypes.adopt_existing(archetypes)
 
           {world, admin_result}
         end)
