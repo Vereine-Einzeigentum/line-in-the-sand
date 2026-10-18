@@ -8,6 +8,7 @@ defmodule LineWebWeb.PlaytestControllerTest do
   setup do
     Ecto.Adapters.SQL.Sandbox.checkout(Repo)
     Ecto.Adapters.SQL.Sandbox.mode(Repo, :auto)
+    LineCore.Archetypes.seed()
 
     # Set env var for the duration of the test
     System.put_env("PLAYTEST_TOKEN", @playtest_token)
