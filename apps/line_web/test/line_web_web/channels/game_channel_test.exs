@@ -7,6 +7,7 @@ defmodule LineWebWeb.GameChannelTest do
   setup do
     Ecto.Adapters.SQL.Sandbox.checkout(Repo)
     Ecto.Adapters.SQL.Sandbox.mode(Repo, :auto)
+    LineCore.Archetypes.seed()
 
     on_exit(fn ->
       Repo.delete_all(LineCore.Schemas.Property)
