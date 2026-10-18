@@ -276,6 +276,7 @@ defmodule LineCore.Archetypes do
       {tree.root, %{name: "get", aliases: ["grab", "gather", "pickup", "take"], module: "get", dobj: "any", prep: "none", iobj: "none", arg_mode: "target_required"}},
       {tree.root, %{name: "drop", aliases: ["leave", "discard", "throw"], module: "drop", dobj: "any", prep: "none", iobj: "none", arg_mode: "target_required"}},
       {tree.root, %{name: "say", aliases: [], module: "say", dobj: "any", prep: "any", iobj: "any", arg_mode: "rest"}},
+      {tree.root, %{name: "emote", aliases: [], module: "emote", dobj: "any", prep: "any", iobj: "any", arg_mode: "rest"}},
 
       {tree.room, %{name: "go", aliases: ["move"], module: "go", dobj: "none", prep: "none", iobj: "none", arg_mode: "rest"}},
 
