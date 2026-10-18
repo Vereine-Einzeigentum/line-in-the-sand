@@ -7,7 +7,8 @@ defmodule LineInTheSand.MixProject do
       version: "0.1.0",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
-      aliases: aliases()
+      aliases: aliases(),
+      releases: releases()
     ]
   end
 
@@ -18,6 +19,20 @@ defmodule LineInTheSand.MixProject do
   defp aliases do
     [
       test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"]
+    ]
+  end
+
+  defp releases do
+    [
+      lits: [
+        applications: [
+          line_shared: :permanent,
+          line_core: :permanent,
+          line_world: :permanent,
+          line_ml: :permanent,
+          line_web: :permanent
+        ]
+      ]
     ]
   end
 
