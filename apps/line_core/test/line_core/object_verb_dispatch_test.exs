@@ -41,7 +41,9 @@ defmodule LineCore.ObjectVerbDispatchTest do
   test "wield is found on direct object's wieldable ancestry", %{tree: tree} do
     room = TestHarness.spawn_room("Hub")
     player = TestHarness.spawn_player_in(room, "Alice")
-    knife = TestHarness.spawn_item_in(player, "knife")
+    knife =
+      TestHarness.spawn_item_in(player, "knife", %{parent_id: tree.weapon.id})
+
     :ok = Archetypes.adopt_existing(tree)
 
     assert {:ok, command} = Parser.parse_world("wield knife")
@@ -50,6 +52,23 @@ defmodule LineCore.ObjectVerbDispatchTest do
     assert match.origin.id == knife.id
     assert match.defined_on.id == tree.wieldable.id
     assert match.verb_name == "wield"
+  end
+
+  test "generic items do not inherit wield, but do inherit scrap", %{tree: tree} do
+    room = TestHarness.spawn_room("Hub")
+    player = TestHarness.spawn_player_in(room, "Alice")
+    cup = TestHarness.spawn_item_in(player, "coffee cup")
+
+    assert cup.parent_id == tree.item.id
+
+    assert {:ok, wield_command} = Parser.parse_world("wield coffee cup")
+    assert {:error, :no_matching_verb} = VerbSearch.resolve(player.id, wield_command)
+
+    assert {:ok, scrap_command} = Parser.parse_world("scrap coffee cup")
+    assert {:ok, scrap_match} = VerbSearch.resolve(player.id, scrap_command)
+    assert scrap_match.origin.id == cup.id
+    assert scrap_match.defined_on.id == tree.item.id
+    assert scrap_match.verb_name == "scrap"
   end
 
   test "verb search order prefers actor before room before direct object", %{tree: tree} do
