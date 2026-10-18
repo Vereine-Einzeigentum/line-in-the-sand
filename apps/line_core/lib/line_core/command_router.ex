@@ -14,19 +14,26 @@ defmodule LineCore.CommandRouter do
         Dispatcher.dispatch(actor_id, verb_module, args, raw)
 
       {:world, command} ->
-        with {:ok, match} <- VerbSearch.resolve(actor_id, command) do
-          Dispatcher.dispatch_resolved(
-            actor_id,
-            match.module,
-            match.args,
-            raw,
-            match.context.dobj,
-            match.context.iobj
-          )
+        case VerbSearch.resolve(actor_id, command) do
+          {:ok, match} ->
+            Dispatcher.dispatch_resolved(
+              actor_id,
+              match.module,
+              match.args,
+              raw,
+              match.context.dobj,
+              match.context.iobj
+            )
+
+          {:error, :no_matching_verb} ->
+            {:error, :unknown_verb}
+
+          {:error, reason} ->
+            {:error, reason}
         end
 
       {:empty, _} ->
-        :ok
+        {:error, :empty_command}
     end
   end
 end
