@@ -71,6 +71,31 @@ defmodule LineCore.ParserTest do
     end
   end
 
+  describe "parse/1 — social prefixes" do
+    test "colon prefix routes directly to free emote" do
+      assert {:ok, Verbs.Emote, ["leans against the wall."]} =
+               Parser.parse(":leans against the wall.")
+    end
+
+    test "empty colon prefix still routes to emote for verb-level validation" do
+      assert {:ok, Verbs.Emote, [""]} = Parser.parse(":")
+    end
+
+    test "dot prefix routes directly to sanctioned social namespace" do
+      assert {:ok, Verbs.Social, ["hi"]} = Parser.parse(".hi")
+      assert {:ok, Verbs.Social, ["wave", "Graves"]} = Parser.parse(".wave Graves")
+    end
+
+    test "sanctioned social names never fall through ordinary verb aliases" do
+      assert {:ok, Verbs.Social, ["hi"]} = Parser.parse(".hi")
+      refute match?({:ok, Verbs.Attack, _}, Parser.parse(".hi"))
+    end
+
+    test "empty dot prefix routes to social for verb-level validation" do
+      assert {:ok, Verbs.Social, []} = Parser.parse(".")
+    end
+  end
+
   describe "parse/1 — speak prefix" do
     test "quote prefix routes to Say" do
       assert {:ok, Verbs.Say, ["hello there"]} = Parser.parse(~s("hello there))
