@@ -138,13 +138,24 @@ defmodule LineCore.Combat do
 
     equipment_events =
       Enum.flat_map(equipped, fn {rel_type, object} ->
-        [
-          {:unrelate, victim_id, object.id, rel_type},
-          {:relate, corpse, object.id, :contains}
-        ]
+        if directly_contained_by?(object.id, victim_id) do
+          [{:unrelate, victim_id, object.id, rel_type}]
+        else
+          [
+            {:unrelate, victim_id, object.id, rel_type},
+            {:relate, corpse, object.id, :contains}
+          ]
+        end
       end)
 
     create_events ++ carry_events ++ equipment_events
+  end
+
+  defp directly_contained_by?(object_id, container_id) do
+    case Object.container_of(object_id) do
+      %{id: ^container_id} -> true
+      _ -> false
+    end
   end
 
   defp safehouse_room_id do
