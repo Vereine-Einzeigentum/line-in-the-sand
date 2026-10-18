@@ -225,6 +225,14 @@ defmodule LineCore.Dispatcher do
     Multi.insert(multi, {:create_object, make_ref()}, Object.changeset(%Object{}, attrs))
   end
 
+  defp apply_event_to_multi(multi, {:update_object, object_id, attrs}, _ctx) do
+    Multi.update(
+      multi,
+      {:update_object, object_id, make_ref()},
+      Object.changeset(LineCore.Object.get!(object_id), attrs)
+    )
+  end
+
   defp apply_event_to_multi(multi, {:delete_object, object_id}, _ctx) do
     import Ecto.Query
 
