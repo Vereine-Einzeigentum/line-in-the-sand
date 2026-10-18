@@ -31,6 +31,9 @@ defmodule LineCore.VerbInvocation do
       "container_put" ->
         object_pair(command)
 
+      "object_pair" ->
+        object_pair(command)
+
       _ ->
         maybe_one(command.argstr)
     end
