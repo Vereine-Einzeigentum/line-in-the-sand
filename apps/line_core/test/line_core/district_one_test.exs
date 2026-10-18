@@ -1,7 +1,7 @@
 defmodule LineCore.Seed.DistrictOneTest do
   use ExUnit.Case, async: false
 
-  alias LineCore.{Object, Repo, TestHarness}
+  alias LineCore.{Archetypes, Object, Repo, TestHarness}
   alias LineCore.Seed.DistrictOne
   alias LineCore.Verbs.{Go, Get, Look, Examine, Inventory, Scrap, Sell}
 
@@ -37,6 +37,36 @@ defmodule LineCore.Seed.DistrictOneTest do
       Object.contents(result.scrap_zones.center.id) |> Enum.filter(&(&1.type == :item))
 
     assert length(sz_center_items) >= 1
+  end
+
+  test "seed assigns semantic parents instead of the legacy item bucket" do
+    result = DistrictOne.seed()
+
+    room_arch = Archetypes.get(:room)
+    npc_arch = Archetypes.get(:npc)
+    item_arch = Archetypes.get(:item)
+    weapon_arch = Archetypes.get(:weapon)
+
+    assert room_arch
+    assert npc_arch
+    assert item_arch
+    assert weapon_arch
+
+    assert result.safehouse.parent_id == room_arch.id
+    assert result.fence_shop.parent_id == room_arch.id
+    assert result.fence.parent_id == npc_arch.id
+
+    center_items = Object.contents(result.scrap_zones.center.id)
+    west_items = Object.contents(result.scrap_zones.w.id)
+
+    pipe = Object.find_by_name(center_items, "twisted pipe")
+    crowbar = Object.find_by_name(center_items, "bent crowbar")
+    pistol_frame = Object.find_by_name(west_items, "scrap pistol frame")
+
+    assert pipe.parent_id == item_arch.id
+    assert pistol_frame.parent_id == item_arch.id
+    assert crowbar.parent_id == weapon_arch.id
+    assert Object.descendant_of?(crowbar.id, Archetypes.get(:wieldable).id)
   end
 
   test "seed is idempotent" do
