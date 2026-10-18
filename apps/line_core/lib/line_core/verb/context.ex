@@ -12,6 +12,8 @@ defmodule LineCore.Verb.Context do
   - `:room` — the Object representing the room the actor is in
   - `:room_contents` — the list of Objects currently in the room
                        (includes other players, NPCs, items, exits)
+  - `:dobj` — resolved direct object, or nil
+  - `:iobj` — resolved indirect object, or nil
   - `:command` — the original raw command string (for logging/debugging)
   - `:now` — DateTime of dispatch, so verbs that depend on time
               (cooldowns, day/night) use a consistent reference
@@ -23,9 +25,11 @@ defmodule LineCore.Verb.Context do
           actor: Object.t(),
           room: Object.t(),
           room_contents: [Object.t()],
+          dobj: Object.t() | nil,
+          iobj: Object.t() | nil,
           command: String.t(),
           now: DateTime.t()
         }
 
-  defstruct [:actor, :room, :room_contents, :command, :now]
+  defstruct [:actor, :room, :room_contents, :dobj, :iobj, :command, :now]
 end
