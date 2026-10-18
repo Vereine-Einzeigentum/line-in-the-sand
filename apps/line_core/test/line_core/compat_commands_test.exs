@@ -151,6 +151,7 @@ defmodule LineCore.CompatCommandsTest do
     assert :ok = CommandRouter.dispatch(ctx.player.id, "page Bob hello from Hub")
     assert_receive {:msg, page}, 200
     assert page =~ "hello from Hub"
+    TestHarness.drain()
 
     assert :ok = CommandRouter.dispatch(ctx.player.id, "whereis Bob")
     TestHarness.assert_msg(~r/Bob.*Other/i)
@@ -168,10 +169,14 @@ defmodule LineCore.CompatCommandsTest do
     TestHarness.connect_rooms(ctx.room, east, "east", one_way: true)
 
     assert :ok = CommandRouter.dispatch(ctx.player.id, "lmap")
-    TestHarness.assert_msg(~r/Hub.*north.*east/is)
+    map = TestHarness.assert_msg(~r/Hub/is)
+    assert map =~ "north"
+    assert map =~ "east"
 
     assert :ok = CommandRouter.dispatch(ctx.player.id, "exits")
-    TestHarness.assert_msg(~r/north.*east/is)
+    exits = TestHarness.assert_msg(~r/Exits:/i)
+    assert exits =~ "north"
+    assert exits =~ "east"
   end
 
   test "@describe is a LambdaCore alias for self description", ctx do
@@ -190,6 +195,7 @@ defmodule LineCore.CompatCommandsTest do
     LineCore.PubSub.subscribe({:actor, mod.id})
 
     assert :ok = CommandRouter.dispatch(mod.id, "@create $container named satchel")
+    TestHarness.assert_msg(~r/Created satchel/i)
     satchel = Object.contents(mod.id) |> Object.find_by_name("satchel")
     assert satchel
     assert Object.descendant_of?(satchel.id, ctx.tree.container.id)
@@ -201,9 +207,11 @@ defmodule LineCore.CompatCommandsTest do
     TestHarness.assert_msg(~r/satchel/i)
 
     assert :ok = CommandRouter.dispatch(mod.id, "@move satchel to here")
+    TestHarness.assert_msg(~r/Moved satchel/i)
     assert Object.container_of(satchel.id).id == ctx.room.id
 
     assert :ok = CommandRouter.dispatch(mod.id, "@recycle satchel")
+    TestHarness.assert_msg(~r/Recycled satchel/i)
     assert Object.get(satchel.id) == nil
   end
 
