@@ -93,6 +93,7 @@ defmodule LineWebWeb.PlayerChannel do
   defp error_text(:actor_not_in_room), do: "You're nowhere."
   defp error_text(:no_exit), do: "You can't go that way."
   defp error_text(:not_here), do: "You don't see that here."
-  defp error_text(:no_matching_verb), do: "Huh?"
+  defp error_text(:unknown_verb), do: "Huh?"
+  defp error_text(:empty_command), do: ""
   defp error_text(reason), do: "Error: #{inspect(reason)}"
 end
