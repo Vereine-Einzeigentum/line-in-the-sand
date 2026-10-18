@@ -3,6 +3,12 @@ defmodule LineCore.Release do
 
   @app :line_core
 
+  def prepare do
+    migrate()
+    bootstrap_admin()
+    :ok
+  end
+
   def migrate do
     load_app()
 
