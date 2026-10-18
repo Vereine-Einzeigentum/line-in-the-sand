@@ -1,14 +1,14 @@
 defmodule LineCore.Verbs.Get do
   @moduledoc """
-  `get <item>` — pick up an item from the current room into inventory.
+  `get <item>` picks an item up from the current room.
 
-  Searches the room contents for an item matching the name (case-insensitive,
-  substring match). If found and gettable, moves it into the actor's contents.
+  `get <item> from <container>` is selected through the target container's
+  inherited verb and moves a direct child of that container into inventory.
   """
 
   @behaviour LineCore.Verb
 
-  alias LineCore.Object
+  alias LineCore.{Container, Object}
 
   @impl true
   def execute(_ctx, []), do: {:error, :get_what}
@@ -34,5 +34,39 @@ defmodule LineCore.Verbs.Get do
     end
   end
 
+  def execute(ctx, [_item_name, _container_name]) do
+    item = ctx.dobj
+    container = ctx.iobj
+
+    cond do
+      is_nil(item) ->
+        {:error, :not_found}
+
+      is_nil(container) ->
+        {:error, :not_found}
+
+      not directly_contained_by?(item.id, container.id) ->
+        {:error, :not_in_container}
+
+      true ->
+        with :ok <- Container.accessible?(container.id) do
+          {:ok,
+           [
+             {:move, item.id, ctx.actor.id, :contains},
+             {:notify_actor, "You take the #{item.name} from the #{container.name}."},
+             {:notify_room, "#{ctx.actor.name} takes something from the #{container.name}.",
+              except: [ctx.actor.id]}
+           ]}
+        end
+    end
+  end
+
   def execute(_ctx, _args), do: {:error, :bad_args}
+
+  defp directly_contained_by?(object_id, container_id) do
+    case Object.container_of(object_id) do
+      %{id: ^container_id} -> true
+      _ -> false
+    end
+  end
 end
