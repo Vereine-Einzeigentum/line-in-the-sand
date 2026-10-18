@@ -140,6 +140,8 @@ defmodule LineWebWeb.GameChannel do
   end
 
 
+  defp format_reason(:unknown_verb), do: "unknown verb"
+  defp format_reason(:empty_command), do: "empty command"
   defp format_reason(reason) when is_atom(reason), do: to_string(reason)
   defp format_reason({tag, _detail}) when is_atom(tag), do: to_string(tag)
   defp format_reason(other), do: inspect(other)
