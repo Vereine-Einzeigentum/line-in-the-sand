@@ -3,15 +3,14 @@ defmodule LineCore.Verbs.Look do
   `look` — describe the current room and what's in it.
   `look <target>` — describe a specific object.
 
-  Direct-object resolution recognizes `self`/`me`, `here`, the current
-  room by name, objects in the room, and objects in the actor's inventory.
+  Direct-object resolution uses the shared visible-object resolver.
 
   Pure: produces notify events, no state changes.
   """
 
   @behaviour LineCore.Verb
 
-  alias LineCore.{Object, Renderer}
+  alias LineCore.{Object, Renderer, Resolver}
 
   @impl true
   def execute(ctx, []) do
@@ -19,7 +18,7 @@ defmodule LineCore.Verbs.Look do
   end
 
   def execute(ctx, [target_name]) do
-    case resolve_target(ctx, target_name) do
+    case Resolver.visible(ctx, target_name) do
       nil ->
         {:error, :not_found}
 
@@ -46,26 +45,6 @@ defmodule LineCore.Verbs.Look do
   end
 
   ## Helpers
-
-  defp resolve_target(ctx, target_name) when is_binary(target_name) do
-    normalized = target_name |> String.trim() |> String.downcase()
-
-    case normalized do
-      "self" ->
-        ctx.actor
-
-      "me" ->
-        ctx.actor
-
-      "here" ->
-        ctx.room
-
-      _ ->
-        Object.find_by_name([ctx.room], target_name) ||
-          Object.find_by_name(ctx.room_contents, target_name) ||
-          Object.find_by_name(Object.contents(ctx.actor.id), target_name)
-    end
-  end
 
   defp exits_line(room) do
     case Object.exits(room.id) do
