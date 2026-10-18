@@ -52,6 +52,21 @@ defmodule LineCore.CompatCommandsTest do
     TestHarness.assert_msg(~r/knife.*coat/is)
   end
 
+  test "ordinary emote command matches the colon shorthand", ctx do
+    assert :ok = CommandRouter.dispatch(ctx.player.id, "emote leans against the wall.")
+    TestHarness.assert_msg("Alice leans against the wall.")
+  end
+
+  test "look in a container reports its direct contents", ctx do
+    {:ok, box} = Object.create(:item, "box", %{parent_id: ctx.tree.container.id})
+    {:ok, coin} = Object.create(:item, "coin")
+    {:ok, _} = Object.relate(ctx.room.id, box.id, :contains)
+    {:ok, _} = Object.relate(box.id, coin.id, :contains)
+
+    assert :ok = CommandRouter.dispatch(ctx.player.id, "look in box")
+    TestHarness.assert_msg(~r/box.*coin/is)
+  end
+
   test "give/hand transfers a carried object to another local actor", ctx do
     bob = TestHarness.spawn_player_in(ctx.room, "Bob")
     coin = TestHarness.spawn_item_in(ctx.player, "coin")
@@ -213,6 +228,26 @@ defmodule LineCore.CompatCommandsTest do
     assert :ok = CommandRouter.dispatch(mod.id, "@recycle satchel")
     TestHarness.assert_msg(~r/Recycled satchel/i)
     assert Object.get(satchel.id) == nil
+  end
+
+  test "moderator @open creates a real exit object and traversable direction", ctx do
+    destination = TestHarness.spawn_room("Destination")
+    {:ok, mod} = Object.create(:player, "Mod", %{parent_id: ctx.tree.mod.id})
+    {:ok, _} = Object.relate(ctx.room.id, mod.id, :contains)
+    LineCore.PubSub.subscribe({:actor, mod.id})
+
+    assert :ok = CommandRouter.dispatch(mod.id, "@open north to Destination")
+    TestHarness.assert_msg(~r/Opened north/i)
+
+    assert %{id: destination_id} = Object.resolve_exit(ctx.room.id, "north")
+    assert destination_id == destination.id
+
+    exits =
+      Object.contents(ctx.room.id)
+      |> Enum.filter(&Object.descendant_of?(&1.id, ctx.tree.exit.id))
+
+    assert [exit] = exits
+    assert Object.owns?(mod.id, exit.id)
   end
 
   test "ordinary players cannot use moderator builder commands", ctx do
