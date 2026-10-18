@@ -3,9 +3,10 @@ defmodule LineCore.Verbs.Who do
   `who` — list players currently online (OOC).
   `who <player>` — return online status for a named player (OOC).
 
-  Reads from `LineCore.Presence`. The output is marked OOC since it
-  references real-world session state, not in-world knowledge. Phase 1+
-  may add an in-world matrix/directory system for diegetic profiles.
+  Reads from `LineCore.Presence`, but the caller is always included in their
+  own `who` result. This makes the command correct during the small window
+  before websocket presence registration completes and for non-websocket
+  dispatchers such as tests/admin tooling.
   """
 
   @behaviour LineCore.Verb
@@ -13,26 +14,25 @@ defmodule LineCore.Verbs.Who do
   alias LineCore.{Object, Presence}
 
   @impl true
-  def execute(_ctx, []) do
-    online_ids = Presence.online_player_ids()
+  def execute(ctx, []) do
+    online_ids =
+      [ctx.actor.id | Presence.online_player_ids()]
+      |> Enum.uniq()
 
-    lines =
-      case online_ids do
-        [] ->
-          ["[OOC] No one else is online."]
+    names =
+      online_ids
+      |> Enum.map(&Object.get/1)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.map(& &1.name)
+      |> Enum.sort()
 
-        ids ->
-          names =
-            ids
-            |> Enum.map(&Object.get/1)
-            |> Enum.reject(&is_nil/1)
-            |> Enum.map(& &1.name)
-            |> Enum.sort()
-
-          ["[OOC] Online (#{length(names)}): " <> Enum.join(names, ", ")]
+    line =
+      case names do
+        [] -> "[OOC] No one is online."
+        _ -> "[OOC] Online (#{length(names)}): " <> Enum.join(names, ", ")
       end
 
-    {:ok, [{:notify_actor, Enum.join(lines, "\n")}]}
+    {:ok, [{:notify_actor, line}]}
   end
 
   def execute(_ctx, [name]) do
