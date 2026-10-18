@@ -226,6 +226,37 @@ defmodule LineCore.Object do
     |> Repo.one()
   end
 
+  @doc "True when object_id is transitively contained by container_id."
+  def contained_by?(object_id, container_id) do
+    do_contained_by?(object_id, container_id, MapSet.new())
+  end
+
+  defp do_contained_by?(object_id, container_id, seen) do
+    cond do
+      object_id == container_id ->
+        true
+
+      MapSet.member?(seen, object_id) ->
+        false
+
+      true ->
+        case container_of(object_id) do
+          nil ->
+            false
+
+          %{id: ^container_id} ->
+            true
+
+          parent_container ->
+            do_contained_by?(
+              parent_container.id,
+              container_id,
+              MapSet.put(seen, object_id)
+            )
+        end
+    end
+  end
+
   ## Exit queries
 
   @doc "All exits from a room: list of {direction_string, destination_room_object}."
