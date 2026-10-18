@@ -17,6 +17,7 @@ defmodule LineCore.VerbRegistry do
     "put" => Verbs.Put,
     "drop" => Verbs.Drop,
     "say" => Verbs.Say,
+    "emote" => Verbs.Emote,
     "attack" => Verbs.Attack,
     "wield" => Verbs.Wield,
     "scrap" => Verbs.Scrap,
