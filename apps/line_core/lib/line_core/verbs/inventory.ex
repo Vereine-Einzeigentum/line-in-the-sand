@@ -12,12 +12,15 @@ defmodule LineCore.Verbs.Inventory do
 
   @impl true
   def execute(ctx, []) do
+    equipped = Object.equipped(ctx.actor.id)
+    equipped_ids = MapSet.new(equipped, fn {_type, object} -> object.id end)
+
     items =
       ctx.actor.id
       |> Object.contents()
       |> Enum.filter(&(&1.type == :item))
+      |> Enum.reject(&MapSet.member?(equipped_ids, &1.id))
 
-    equipped = Object.equipped(ctx.actor.id)
     wielded = Enum.filter(equipped, fn {t, _} -> t in [:wields_main, :wields_off] end)
     worn = Enum.filter(equipped, fn {t, _} -> t == :wears end)
 
