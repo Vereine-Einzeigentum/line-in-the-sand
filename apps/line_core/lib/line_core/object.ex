@@ -35,8 +35,8 @@ defmodule LineCore.Object do
 
   ## Properties
 
-  @doc "Get a property value by key. Returns nil if not set."
-  def get_property(object_id, key) do
+  @doc "Get a local property value only, without consulting inheritance."
+  def get_local_property(object_id, key) do
     from(p in Property, where: p.object_id == ^object_id and p.key == ^key, select: p.value)
     |> Repo.one()
     |> case do
@@ -46,7 +46,12 @@ defmodule LineCore.Object do
     end
   end
 
-  @doc "Get a property with a default if not set."
+  @doc "Get the effective property value, walking parent objects when absent locally."
+  def get_property(object_id, key) do
+    do_get_property(object_id, key, MapSet.new())
+  end
+
+  @doc "Get an effective property with a default if not found."
   def get_property(object_id, key, default) do
     case get_property(object_id, key) do
       nil -> default
@@ -54,7 +59,24 @@ defmodule LineCore.Object do
     end
   end
 
-  @doc "Set a property. Upserts."
+  defp do_get_property(object_id, key, seen) do
+    if MapSet.member?(seen, object_id) do
+      nil
+    else
+      case get_local_property(object_id, key) do
+        nil ->
+          case parent(object_id) do
+            nil -> nil
+            parent -> do_get_property(parent.id, key, MapSet.put(seen, object_id))
+          end
+
+        value ->
+          value
+      end
+    end
+  end
+
+  @doc "Set a property locally. Upserts; inherited values are never mutated."
   def set_property(object_id, key, value) do
     # Wrap scalar values in a map so JSONB can store them uniformly.
     stored_value = if is_map(value), do: value, else: %{"v" => value}
@@ -89,6 +111,41 @@ defmodule LineCore.Object do
     )
     |> Repo.all()
     |> Enum.map(fn {k, v} -> {k, unwrap(v)} end)
+  end
+
+  ## Inheritance
+
+  @doc "Return the object's direct inheritance parent, or nil."
+  def parent(object_id) do
+    case get(object_id) do
+      %{parent_id: nil} -> nil
+      %{parent_id: parent_id} -> get(parent_id)
+      nil -> nil
+    end
+  end
+
+  @doc "Return direct parent first, then each ancestor up to the root."
+  def ancestors(object_id) do
+    do_ancestors(object_id, MapSet.new())
+  end
+
+  defp do_ancestors(object_id, seen) do
+    if MapSet.member?(seen, object_id) do
+      []
+    else
+      case parent(object_id) do
+        nil ->
+          []
+
+        ancestor ->
+          [ancestor | do_ancestors(ancestor.id, MapSet.put(seen, object_id))]
+      end
+    end
+  end
+
+  @doc "True when object_id inherits from ancestor_id at any depth."
+  def descendant_of?(object_id, ancestor_id) do
+    Enum.any?(ancestors(object_id), &(&1.id == ancestor_id))
   end
 
   ## Relationships
