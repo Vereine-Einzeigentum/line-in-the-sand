@@ -23,6 +23,7 @@ defmodule LineCore.BootstrapAdmin do
     name = String.trim(name)
     password = String.trim(password)
     email = opts |> Keyword.get(:email) |> normalize_optional()
+    starting_room_id = opts |> Keyword.get(:starting_room_id) |> normalize_optional()
 
     cond do
       name == "" ->
@@ -35,10 +36,11 @@ defmodule LineCore.BootstrapAdmin do
         Repo.transaction(fn ->
           case Object.find_player_by_name(name) do
             nil ->
-              create_admin!(name, password, email)
+              create_admin!(name, password, email, starting_room_id)
 
             admin ->
               mark_admin!(admin, email)
+              ensure_starting_room!(admin, starting_room_id)
               {:existing, admin}
           end
         end)
@@ -68,7 +70,7 @@ defmodule LineCore.BootstrapAdmin do
     end
   end
 
-  defp create_admin!(name, password, email) do
+  defp create_admin!(name, password, email, starting_room_id) do
     hash = Bcrypt.hash_pwd_salt(password)
 
     admin =
@@ -80,8 +82,24 @@ defmodule LineCore.BootstrapAdmin do
     put!(admin.id, "password_hash", hash)
     put!(admin.id, "temp_password", false)
     mark_admin!(admin, email)
+    ensure_starting_room!(admin, starting_room_id)
 
     {:created, admin}
+  end
+
+  defp ensure_starting_room!(_admin, nil), do: :ok
+
+  defp ensure_starting_room!(admin, starting_room_id) do
+    case Object.container_of(admin.id) do
+      nil ->
+        case Object.relate(starting_room_id, admin.id, :contains) do
+          {:ok, _relationship} -> :ok
+          {:error, reason} -> Repo.rollback(reason)
+        end
+
+      _existing_container ->
+        :ok
+    end
   end
 
   defp mark_admin!(admin, email) do
