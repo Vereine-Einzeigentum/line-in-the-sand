@@ -23,14 +23,24 @@ defmodule LineCore.VerbInvocation do
         end
 
       "sell" ->
-        case {command.dobjstr, command.iobjstr} do
-          {nil, _} -> []
-          {item, nil} -> [item]
-          {item, buyer} -> [item, buyer]
-        end
+        object_pair(command)
+
+      "container_get" ->
+        object_pair(command)
+
+      "container_put" ->
+        object_pair(command)
 
       _ ->
         maybe_one(command.argstr)
+    end
+  end
+
+  defp object_pair(command) do
+    case {command.dobjstr, command.iobjstr} do
+      {nil, _} -> []
+      {item, nil} -> [item]
+      {item, container} -> [item, container]
     end
   end
 
