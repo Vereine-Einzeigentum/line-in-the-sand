@@ -1,12 +1,14 @@
 defmodule LineCore.CombatTest do
   use ExUnit.Case, async: false
 
-  alias LineCore.{Combat, Object, Repo, TestHarness}
+  alias LineCore.{Archetypes, Combat, Object, Repo, TestHarness}
   alias LineCore.Verbs.{Attack, Wield, Inventory}
 
   setup do
     Ecto.Adapters.SQL.Sandbox.checkout(Repo)
     Ecto.Adapters.SQL.Sandbox.mode(Repo, :auto)
+
+    tree = Archetypes.seed()
 
     # Seed a safehouse for respawn
     {:ok, safehouse} = Object.create(:room, "Safehouse", %{description: "Restored."})
@@ -19,7 +21,7 @@ defmodule LineCore.CombatTest do
       Repo.delete_all(LineCore.Schemas.Object)
     end)
 
-    {:ok, safehouse: safehouse}
+    {:ok, safehouse: safehouse, tree: tree}
   end
 
   describe "Combat helpers" do
@@ -141,8 +143,9 @@ defmodule LineCore.CombatTest do
   end
 
   describe "Attack verb — lethal & respawn" do
-    test "killing a target moves them to safehouse, restores HP, drops items", %{
-      safehouse: safehouse
+    test "killing a target leaves a corpse container holding their items", %{
+      safehouse: safehouse,
+      tree: tree
     } do
       room = TestHarness.spawn_room("Arena", "A pit.")
       attacker = TestHarness.spawn_player_in(room, "Attacker")
@@ -156,7 +159,7 @@ defmodule LineCore.CombatTest do
 
       TestHarness.dispatch(attacker, Attack, ["Target"])
 
-      # Target now at safehouse with restored HP, lost dirham, knife dropped in arena
+      # Target now at safehouse with restored HP and lost dirham.
       Process.sleep(50)
       assert %{id: id} = Object.container_of(target.id)
       assert id == safehouse.id
@@ -167,9 +170,38 @@ defmodule LineCore.CombatTest do
 
       assert Object.get_property(target.id, "dirham") == 50
 
-      # Knife is in the arena
-      arena_items = Object.contents(room.id) |> Enum.filter(&(&1.type == :item))
-      assert Enum.any?(arena_items, &(&1.id == knife.id))
+      # A persistent corpse remains in the arena and contains the victim's gear.
+      corpses =
+        Object.contents(room.id)
+        |> Enum.filter(&Object.descendant_of?(&1.id, tree.corpse.id))
+
+      assert [corpse] = corpses
+      assert corpse.name == "corpse of Target"
+      assert Object.descendant_of?(corpse.id, tree.container.id)
+      assert Object.container_of(knife.id).id == corpse.id
+    end
+
+    test "wielded and worn objects move into the corpse container", %{tree: tree} do
+      room = TestHarness.spawn_room("Arena")
+      attacker = TestHarness.spawn_player_in(room, "Attacker")
+      target = TestHarness.spawn_player_in(room, "Target")
+      Object.set_property(target.id, "hp_current", 5)
+
+      {:ok, weapon} =
+        Object.create(:item, "knife", %{parent_id: tree.weapon.id})
+
+      Object.relate(target.id, weapon.id, :wields_main)
+
+      TestHarness.dispatch(attacker, Attack, ["Target"])
+      Process.sleep(50)
+
+      corpse =
+        Object.contents(room.id)
+        |> Enum.find(&Object.descendant_of?(&1.id, tree.corpse.id))
+
+      assert corpse
+      assert Object.container_of(weapon.id).id == corpse.id
+      assert Object.related_by(target.id, :wields_main) == []
     end
 
     test "dirham penalty floors at zero", %{safehouse: _safehouse} do
