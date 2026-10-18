@@ -230,14 +230,14 @@ defmodule LineCore.CompatCommandsTest do
     assert Object.get(satchel.id) == nil
   end
 
-  test "moderator @open creates a real exit object and traversable direction", ctx do
+  test "moderator @dig creates a real exit object and traversable direction", ctx do
     destination = TestHarness.spawn_room("Destination")
     {:ok, mod} = Object.create(:player, "Mod", %{parent_id: ctx.tree.mod.id})
     {:ok, _} = Object.relate(ctx.room.id, mod.id, :contains)
     LineCore.PubSub.subscribe({:actor, mod.id})
 
-    assert :ok = CommandRouter.dispatch(mod.id, "@open north to Destination")
-    TestHarness.assert_msg(~r/Opened north/i)
+    assert :ok = CommandRouter.dispatch(mod.id, "@dig north to Destination")
+    TestHarness.assert_msg(~r/Dug exit north/i)
 
     assert %{id: destination_id} = Object.resolve_exit(ctx.room.id, "north")
     assert destination_id == destination.id
