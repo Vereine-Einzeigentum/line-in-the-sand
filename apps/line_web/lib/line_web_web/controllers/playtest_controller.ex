@@ -27,7 +27,7 @@ defmodule LineWebWeb.PlaytestController do
 
   use LineWebWeb, :controller
 
-  alias LineCore.{Parser, PlaytestSession}
+  alias LineCore.PlaytestSession
 
   ## Plug pipeline
 
@@ -68,31 +68,14 @@ defmodule LineWebWeb.PlaytestController do
 
   def command(conn, %{"raw" => raw} = _params) when is_binary(raw) do
     token = conn.assigns.session_token
-
-    case Parser.parse(raw) do
-      {:ok, verb_module, args} ->
-        dispatch_and_respond(conn, token, verb_module, args, raw)
-
-      {:empty, _} ->
-        conn |> put_status(:bad_request) |> json(%{error: "empty command"})
-
-      {:unknown, verb, _input} ->
-        conn |> put_status(:bad_request) |> json(%{error: "unknown verb: #{verb}"})
-    end
+    dispatch_raw_and_respond(conn, token, raw)
   end
 
   def command(conn, %{"verb" => verb} = params) do
     token = conn.assigns.session_token
     args = Map.get(params, "args", [])
     raw = "#{verb} #{Enum.join(args, " ")}" |> String.trim()
-
-    case lookup_verb(verb) do
-      {:ok, verb_module} ->
-        dispatch_and_respond(conn, token, verb_module, args, raw)
-
-      :error ->
-        conn |> put_status(:bad_request) |> json(%{error: "unknown verb: #{verb}"})
-    end
+    dispatch_raw_and_respond(conn, token, raw)
   end
 
   def command(conn, _params) do
@@ -163,19 +146,10 @@ defmodule LineWebWeb.PlaytestController do
     end
   end
 
-  ## Verb resolution from pre-parsed form
-
-  defp lookup_verb(verb) when is_binary(verb) do
-    case Map.get(Parser.verb_map(), String.downcase(verb)) do
-      nil -> :error
-      module -> {:ok, module}
-    end
-  end
-
-  defp dispatch_and_respond(conn, token, verb_module, args, raw) do
-    case PlaytestSession.dispatch_command(token, verb_module, args, raw) do
+  defp dispatch_raw_and_respond(conn, token, raw) do
+    case PlaytestSession.dispatch_raw(token, raw) do
       :ok ->
-        json(conn, %{status: "dispatched", verb: inspect(verb_module), args: args})
+        json(conn, %{status: "dispatched", raw: raw})
 
       {:error, reason} ->
         conn |> put_status(:bad_request) |> json(%{error: inspect(reason)})
