@@ -119,13 +119,13 @@ defmodule LineCore.ItemSpec do
 
   defp map_facts(tag, map) do
     map
-    |> Enum.sort_by(fn {key, _value} -> :erlang.term_to_binary(key) end)
+    |> Enum.sort_by(fn {key, _value} -> key end)
     |> Enum.map(fn {key, value} -> {tag, key, value} end)
   end
 
   defp unknown_facts(unknown) do
     unknown
-    |> Enum.sort_by(&:erlang.term_to_binary/1)
+    |> Enum.sort()
     |> Enum.map(&{:unknown, &1})
   end
 end
