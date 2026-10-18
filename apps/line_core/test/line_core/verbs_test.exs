@@ -2,7 +2,7 @@ defmodule LineCore.VerbsTest do
   use ExUnit.Case, async: false
 
   alias LineCore.{Object, Repo, TestHarness}
-  alias LineCore.Verbs.{Go, Get, Drop, Look, Examine, Inventory, Say, Text, Who, Desc}
+  alias LineCore.Verbs.{Go, Get, Drop, Look, Examine, Inventory, Say, Emote, Social, Text, Who, Desc}
 
   setup do
     Ecto.Adapters.SQL.Sandbox.checkout(Repo)
@@ -224,6 +224,77 @@ defmodule LineCore.VerbsTest do
       player = TestHarness.spawn_player_in(room)
       assert {:error, :say_what} = TestHarness.dispatch(player, Say, [""])
       assert {:error, :say_what} = TestHarness.dispatch(player, Say, [])
+    end
+  end
+
+  ## Emote / Social
+
+  describe "Emote" do
+    test "free emote is text only and broadcasts a pose" do
+      room = TestHarness.spawn_room("Hub")
+      alice = TestHarness.spawn_player_in(room, "Alice")
+      _bob = TestHarness.spawn_player_in(room, "Bob")
+      LineCore.PubSub.subscribe({:room, room.id})
+
+      TestHarness.dispatch(alice, Emote, ["leans against the wall."])
+
+      TestHarness.assert_msg("Alice leans against the wall.")
+      TestHarness.assert_room_msg("Alice leans against the wall.")
+    end
+
+    test "empty free emote is rejected" do
+      room = TestHarness.spawn_room("Hub")
+      player = TestHarness.spawn_player_in(room)
+
+      assert {:error, :emote_what} = TestHarness.dispatch(player, Emote, [""])
+      assert {:error, :emote_what} = TestHarness.dispatch(player, Emote, [])
+    end
+  end
+
+  describe "Social" do
+    test "sanctioned hi executes canonical social text" do
+      room = TestHarness.spawn_room("Hub")
+      alice = TestHarness.spawn_player_in(room, "Alice")
+      _bob = TestHarness.spawn_player_in(room, "Bob")
+      LineCore.PubSub.subscribe({:room, room.id})
+
+      TestHarness.dispatch(alice, Social, ["hi"])
+
+      TestHarness.assert_msg("You wave hello.")
+      TestHarness.assert_room_msg("Alice waves hello.")
+    end
+
+    test "sanctioned social can target a visible object" do
+      room = TestHarness.spawn_room("Hub")
+      alice = TestHarness.spawn_player_in(room, "Alice")
+      _graves = TestHarness.spawn_player_in(room, "Graves")
+      LineCore.PubSub.subscribe({:room, room.id})
+
+      TestHarness.dispatch(alice, Social, ["wave", "Graves"])
+
+      TestHarness.assert_msg("You wave to Graves.")
+      TestHarness.assert_room_msg("Alice waves to Graves.")
+    end
+
+    test "unknown sanctioned social never becomes an ordinary command" do
+      room = TestHarness.spawn_room("Hub")
+      player = TestHarness.spawn_player_in(room)
+
+      assert {:error, :unknown_social} = TestHarness.dispatch(player, Social, ["hit"])
+    end
+
+    test "sanctioned social target must resolve in visible object scope" do
+      room = TestHarness.spawn_room("Hub")
+      player = TestHarness.spawn_player_in(room)
+
+      assert {:error, :not_found} = TestHarness.dispatch(player, Social, ["wave", "Nobody"])
+    end
+
+    test "empty sanctioned social is rejected" do
+      room = TestHarness.spawn_room("Hub")
+      player = TestHarness.spawn_player_in(room)
+
+      assert {:error, :social_what} = TestHarness.dispatch(player, Social, [])
     end
   end
 
