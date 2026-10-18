@@ -99,17 +99,34 @@ defmodule LineCore.Dispatcher do
     |> Repo.transaction()
   end
 
-  defp apply_event_to_multi(multi, {:set_property, object_id, key, value}, _ctx) do
+  defp apply_event_to_multi(multi, {:set_property, object_ref, key, value}, _ctx) do
     stored = if is_map(value), do: value, else: %{"v" => value}
 
-    Multi.insert(
-      multi,
-      {:set_property, object_id, key, make_ref()},
-      %Property{}
-      |> Property.changeset(%{object_id: object_id, key: key, value: stored}),
-      on_conflict: [set: [value: stored, updated_at: DateTime.utc_now()]],
-      conflict_target: [:object_id, :key]
-    )
+    if created_ref?(object_ref) do
+      Multi.run(
+        multi,
+        {:set_property, object_ref, key, make_ref()},
+        fn repo, changes ->
+          object_id = resolve_object_ref!(object_ref, changes)
+
+          %Property{}
+          |> Property.changeset(%{object_id: object_id, key: key, value: stored})
+          |> repo.insert(
+            on_conflict: [set: [value: stored, updated_at: DateTime.utc_now()]],
+            conflict_target: [:object_id, :key]
+          )
+        end
+      )
+    else
+      Multi.insert(
+        multi,
+        {:set_property, object_ref, key, make_ref()},
+        %Property{}
+        |> Property.changeset(%{object_id: object_ref, key: key, value: stored}),
+        on_conflict: [set: [value: stored, updated_at: DateTime.utc_now()]],
+        conflict_target: [:object_id, :key]
+      )
+    end
   end
 
   defp apply_event_to_multi(multi, {:delete_property, object_id, key}, _ctx) do
@@ -122,32 +139,70 @@ defmodule LineCore.Dispatcher do
     )
   end
 
-  defp apply_event_to_multi(multi, {:move, object_id, to_container_id, rel_type}, _ctx) do
+  defp apply_event_to_multi(multi, {:move, object_ref, container_ref, rel_type}, _ctx) do
     import Ecto.Query
 
-    multi
-    |> Multi.delete_all(
-      {:remove_old_container, object_id, make_ref()},
-      from(r in Relationship, where: r.to_id == ^object_id and r.type == ^rel_type)
-    )
-    |> Multi.insert(
-      {:move, object_id, to_container_id, make_ref()},
-      %Relationship{}
-      |> Relationship.changeset(%{
-        from_id: to_container_id,
-        to_id: object_id,
-        type: rel_type
-      })
-    )
+    if created_ref?(object_ref) or created_ref?(container_ref) do
+      Multi.run(
+        multi,
+        {:move, object_ref, container_ref, make_ref()},
+        fn repo, changes ->
+          object_id = resolve_object_ref!(object_ref, changes)
+          to_container_id = resolve_object_ref!(container_ref, changes)
+
+          repo.delete_all(
+            from(r in Relationship, where: r.to_id == ^object_id and r.type == ^rel_type)
+          )
+
+          %Relationship{}
+          |> Relationship.changeset(%{
+            from_id: to_container_id,
+            to_id: object_id,
+            type: rel_type
+          })
+          |> repo.insert()
+        end
+      )
+    else
+      multi
+      |> Multi.delete_all(
+        {:remove_old_container, object_ref, make_ref()},
+        from(r in Relationship, where: r.to_id == ^object_ref and r.type == ^rel_type)
+      )
+      |> Multi.insert(
+        {:move, object_ref, container_ref, make_ref()},
+        %Relationship{}
+        |> Relationship.changeset(%{
+          from_id: container_ref,
+          to_id: object_ref,
+          type: rel_type
+        })
+      )
+    end
   end
 
-  defp apply_event_to_multi(multi, {:relate, from_id, to_id, rel_type}, _ctx) do
-    Multi.insert(
-      multi,
-      {:relate, from_id, to_id, rel_type, make_ref()},
-      %Relationship{}
-      |> Relationship.changeset(%{from_id: from_id, to_id: to_id, type: rel_type})
-    )
+  defp apply_event_to_multi(multi, {:relate, from_ref, to_ref, rel_type}, _ctx) do
+    if created_ref?(from_ref) or created_ref?(to_ref) do
+      Multi.run(
+        multi,
+        {:relate, from_ref, to_ref, rel_type, make_ref()},
+        fn repo, changes ->
+          from_id = resolve_object_ref!(from_ref, changes)
+          to_id = resolve_object_ref!(to_ref, changes)
+
+          %Relationship{}
+          |> Relationship.changeset(%{from_id: from_id, to_id: to_id, type: rel_type})
+          |> repo.insert()
+        end
+      )
+    else
+      Multi.insert(
+        multi,
+        {:relate, from_ref, to_ref, rel_type, make_ref()},
+        %Relationship{}
+        |> Relationship.changeset(%{from_id: from_ref, to_id: to_ref, type: rel_type})
+      )
+    end
   end
 
   defp apply_event_to_multi(multi, {:unrelate, from_id, to_id, rel_type}, _ctx) do
@@ -160,6 +215,10 @@ defmodule LineCore.Dispatcher do
         where: r.from_id == ^from_id and r.to_id == ^to_id and r.type == ^rel_type
       )
     )
+  end
+
+  defp apply_event_to_multi(multi, {:create_object, ref, attrs}, _ctx) do
+    Multi.insert(multi, {:create_object, ref}, Object.changeset(%Object{}, attrs))
   end
 
   defp apply_event_to_multi(multi, {:create_object, attrs}, _ctx) do
@@ -209,4 +268,15 @@ defmodule LineCore.Dispatcher do
   end
 
   defp broadcast_event(_, _), do: :ok
+
+  defp created_ref?({:created, _ref}), do: true
+  defp created_ref?(_), do: false
+
+  defp resolve_object_ref!({:created, ref}, changes) do
+    changes
+    |> Map.fetch!({:create_object, ref})
+    |> Map.fetch!(:id)
+  end
+
+  defp resolve_object_ref!(id, _changes), do: id
 end
