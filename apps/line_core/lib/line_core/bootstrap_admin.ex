@@ -57,14 +57,14 @@ defmodule LineCore.BootstrapAdmin do
   Optional:
     * ADMIN_BOOTSTRAP_EMAIL
   """
-  @spec bootstrap_from_env() :: :skip | {:ok, {:created | :existing, struct()}}
-  def bootstrap_from_env do
+  @spec bootstrap_from_env(keyword()) :: :skip | {:ok, {:created | :existing, struct()}}
+  def bootstrap_from_env(opts \\ []) when is_list(opts) do
     name = System.get_env("ADMIN_BOOTSTRAP_NAME") |> normalize_optional()
     password = System.get_env("ADMIN_BOOTSTRAP_PASSWORD") |> normalize_optional()
     email = System.get_env("ADMIN_BOOTSTRAP_EMAIL") |> normalize_optional()
 
     if name && password do
-      ensure(name, password, email: email)
+      ensure(name, password, Keyword.put(opts, :email, email))
     else
       :skip
     end
