@@ -59,7 +59,7 @@ defmodule LineCore.Archetypes do
     tree
   end
 
-  def adopt_existing(tree \ seed()) do
+  def adopt_existing(tree \\ seed()) do
     from(o in ObjSchema, where: is_nil(o.deleted_at))
     |> Repo.all()
     |> Enum.each(fn object ->
