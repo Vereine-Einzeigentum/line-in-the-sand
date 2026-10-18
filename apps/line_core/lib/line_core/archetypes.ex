@@ -80,7 +80,7 @@ defmodule LineCore.Archetypes do
     tree
   end
 
-  def adopt_existing(tree \ seed()) do
+  def adopt_existing(tree \\ seed()) do
     from(o in ObjSchema, where: is_nil(o.deleted_at))
     |> Repo.all()
     |> Enum.each(fn object ->
@@ -115,7 +115,7 @@ defmodule LineCore.Archetypes do
   Once complete, the root marker prevents later explicitly-wieldable objects
   from being demoted on subsequent deploys.
   """
-  def normalize_legacy_item_parents(tree \ seed()) do
+  def normalize_legacy_item_parents(tree \\ seed()) do
     if Object.get_local_property(tree.root.id, @legacy_item_parent_marker) == true do
       :ok
     else
