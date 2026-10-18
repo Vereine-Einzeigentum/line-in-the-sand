@@ -1,7 +1,7 @@
 defmodule LineWebWeb.AuthController do
   use Phoenix.Controller, formats: [:json]
 
-  alias LineCore.{Object, Repo}
+  alias LineCore.{Adminland, Object, Repo}
   alias LineWebWeb.Endpoint
 
   @max_name 32
@@ -53,14 +53,20 @@ defmodule LineWebWeb.AuthController do
         hash = Object.get_property(player_id, "password_hash")
 
         if is_binary(hash) and Bcrypt.verify_pass(password, hash) do
-          token = sign_token(player_id)
-          must_change = Object.get_property(player_id, "temp_password") == true
+          case Adminland.load_if_admin(player_id) do
+            {:error, _reason} ->
+              json_error(conn, 500, "could not load administrative space")
 
-          json(conn, %{
+            _ ->
+              token = sign_token(player_id)
+              must_change = Object.get_property(player_id, "temp_password") == true
+
+              json(conn, %{
             token: token,
             player_id: player_id,
-            must_change_password: must_change
-          })
+                must_change_password: must_change
+              })
+          end
         else
           login_failed(conn)
         end
