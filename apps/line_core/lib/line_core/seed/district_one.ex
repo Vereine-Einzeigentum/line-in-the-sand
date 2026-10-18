@@ -40,7 +40,7 @@ defmodule LineCore.Seed.DistrictOne do
     "scrap pistol frame"
   ]
 
-  def seed(tree \ Archetypes.seed()) do
+  def seed(tree \\ Archetypes.seed()) do
     case existing_safehouse() do
       nil ->
         do_seed(tree)
