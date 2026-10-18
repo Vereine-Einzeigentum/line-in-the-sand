@@ -57,7 +57,7 @@
       scrollback.push({
         scope: 'system',
         kind: 'error',
-        text: `command failed: ${err.message || err}`
+        text: err.message || String(err)
       });
     });
   }
