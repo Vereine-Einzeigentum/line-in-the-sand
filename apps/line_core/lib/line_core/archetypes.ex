@@ -224,13 +224,15 @@ defmodule LineCore.Archetypes do
     definitions = [
       {tree.root, %{name: "look", aliases: ["l"], module: "look", dobj: "any", prep: "any", iobj: "any", arg_mode: "target_optional"}},
       {tree.root, %{name: "examine", aliases: ["ex", "x"], module: "examine", dobj: "any", prep: "any", iobj: "any", arg_mode: "target_required"}},
-      {tree.root, %{name: "get", aliases: ["grab", "gather", "pickup", "take"], module: "get", dobj: "any", prep: "any", iobj: "any", arg_mode: "target_required"}},
-      {tree.root, %{name: "drop", aliases: ["leave", "put", "discard"], module: "drop", dobj: "any", prep: "any", iobj: "any", arg_mode: "target_required"}},
+      {tree.root, %{name: "get", aliases: ["grab", "gather", "pickup", "take"], module: "get", dobj: "any", prep: "none", iobj: "none", arg_mode: "target_required"}},
+      {tree.root, %{name: "drop", aliases: ["leave", "discard"], module: "drop", dobj: "any", prep: "none", iobj: "none", arg_mode: "target_required"}},
       {tree.root, %{name: "say", aliases: [], module: "say", dobj: "any", prep: "any", iobj: "any", arg_mode: "rest"}},
       {tree.room, %{name: "go", aliases: ["move"], module: "go", dobj: "none", prep: "none", iobj: "none", arg_mode: "rest"}},
       {tree.motile, %{name: "inventory", aliases: ["inv", "i"], module: "inventory", dobj: "none", prep: "none", iobj: "none", arg_mode: "none"}},
       {tree.mob, %{name: "attack", aliases: ["kill", "k", "hit", "stab", "slash", "shoot", "punch"], module: "attack", dobj: "this", prep: "any", iobj: "any", arg_mode: "target_required"}},
       {tree.item, %{name: "scrap", aliases: ["salvage"], module: "scrap", dobj: "this", prep: "none", iobj: "none", arg_mode: "target_required"}},
+      {tree.container, %{name: "get", aliases: ["grab", "gather", "pickup", "take"], module: "get", dobj: "any", prep: "from", iobj: "this", arg_mode: "container_get"}},
+      {tree.container, %{name: "put", aliases: ["place"], module: "put", dobj: "any", prep: "in", iobj: "this", arg_mode: "container_put"}},
       {tree.wieldable, %{name: "wield", aliases: ["hold", "equip"], module: "wield", dobj: "this", prep: "none", iobj: "none", arg_mode: "wield"}},
       {tree.npc, %{name: "sell", aliases: ["fence"], module: "sell", dobj: "any", prep: "any", iobj: "this", arg_mode: "sell"}}
     ]
