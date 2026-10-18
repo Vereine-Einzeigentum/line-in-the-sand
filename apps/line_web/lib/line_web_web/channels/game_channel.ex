@@ -20,7 +20,7 @@ defmodule LineWebWeb.GameChannel do
 
   use Phoenix.Channel
 
-  alias LineCore.{Dispatcher, Object, Parser, Presence, PubSub}
+  alias LineCore.{CommandRouter, Object, Presence, PubSub}
 
   ## Join
 
@@ -87,26 +87,14 @@ defmodule LineWebWeb.GameChannel do
 
   @impl true
   def handle_in("command", %{"raw" => raw}, socket) when is_binary(raw) do
-    case Parser.parse(raw) do
-      {:ok, verb_module, args} ->
-        case Dispatcher.dispatch(socket.assigns.player_id, verb_module, args, raw) do
-          :ok ->
-            # If the verb was Go, we may have moved rooms — re-subscribe.
-            socket = maybe_resubscribe_room(socket, verb_module)
-            {:reply, {:ok, %{status: "dispatched"}}, socket}
+    case CommandRouter.dispatch(socket.assigns.player_id, raw) do
+      :ok ->
+        socket = maybe_resubscribe_room(socket)
+        {:reply, {:ok, %{status: "dispatched"}}, socket}
 
-          {:error, reason} ->
-            push(socket, "error", %{reason: format_reason(reason)})
-            {:reply, {:error, %{reason: format_reason(reason)}}, socket}
-        end
-
-      {:empty, _} ->
-        push(socket, "error", %{reason: "empty command"})
-        {:reply, {:error, %{reason: "empty command"}}, socket}
-
-      {:unknown, verb, _} ->
-        push(socket, "error", %{reason: "unknown verb: #{verb}"})
-        {:reply, {:error, %{reason: "unknown verb: #{verb}"}}, socket}
+      {:error, reason} ->
+        push(socket, "error", %{reason: format_reason(reason)})
+        {:reply, {:error, %{reason: format_reason(reason)}}, socket}
     end
   end
 
@@ -136,7 +124,7 @@ defmodule LineWebWeb.GameChannel do
 
   ## Helpers
 
-  defp maybe_resubscribe_room(socket, LineCore.Verbs.Go) do
+  defp maybe_resubscribe_room(socket) do
     player_id = socket.assigns.player_id
     new_room = Object.container_of(player_id)
 
@@ -151,7 +139,6 @@ defmodule LineWebWeb.GameChannel do
     end
   end
 
-  defp maybe_resubscribe_room(socket, _verb), do: socket
 
   defp format_reason(reason) when is_atom(reason), do: to_string(reason)
   defp format_reason({tag, _detail}) when is_atom(tag), do: to_string(tag)
