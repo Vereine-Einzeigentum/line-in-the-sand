@@ -34,4 +34,11 @@ defmodule LineCore.Resolver do
           Object.find_by_name(Object.contents(ctx.actor.id), name)
     end
   end
+
+  @doc "Resolve a named object directly inside a specific container."
+  def within(container, name) when is_binary(name) do
+    container.id
+    |> Object.contents()
+    |> Object.find_by_name(name)
+  end
 end
