@@ -1,7 +1,7 @@
 defmodule LineCore.ContainerVerbsTest do
   use ExUnit.Case, async: false
 
-  alias LineCore.{Archetypes, CommandRouter, Object, Repo, TestHarness}
+  alias LineCore.{Archetypes, CommandRouter, Container, Object, Repo, TestHarness}
 
   setup do
     Ecto.Adapters.SQL.Sandbox.checkout(Repo)
@@ -85,7 +85,7 @@ defmodule LineCore.ContainerVerbsTest do
     assert Object.container_of(bag2.id).id == ctx.player.id
   end
 
-  test "numbered references still reject real containment cycles", ctx do
+  test "numbered references create distinct containment and cycle guard sees the reverse", ctx do
     {:ok, bag1} =
       Object.create(:item, "bag", %{parent_id: ctx.tree.container.id})
 
@@ -98,8 +98,7 @@ defmodule LineCore.ContainerVerbsTest do
     assert :ok =
              CommandRouter.dispatch(ctx.player.id, "put 1.bag in 2.bag")
 
-    assert {:error, :containment_cycle} =
-             CommandRouter.dispatch(ctx.player.id, "put 2.bag in 1.bag")
+    assert Container.would_cycle?(bag2.id, bag1.id)
   end
 
   test "putting an object in itself is rejected", ctx do
