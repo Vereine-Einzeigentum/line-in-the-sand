@@ -36,7 +36,7 @@ defmodule LineCore.ContainerVerbsTest do
   end
 
   test "get from resolves an object nested inside the indirect container", ctx do
-    :ok = Object.move(ctx.coin.id, ctx.corpse.id)
+    {:ok, {:ok, _}} = Object.move(ctx.coin.id, ctx.corpse.id)
 
     assert :ok = CommandRouter.dispatch(ctx.player.id, "get bent coin from corpse")
 
@@ -60,7 +60,7 @@ defmodule LineCore.ContainerVerbsTest do
 
     {:ok, _} = Object.relate(ctx.room.id, robot_corpse.id, :contains)
     {:ok, _} = Object.set_property(robot_corpse.id, "locked", true)
-    :ok = Object.move(ctx.coin.id, robot_corpse.id)
+    {:ok, {:ok, _}} = Object.move(ctx.coin.id, robot_corpse.id)
 
     assert {:error, :container_locked} =
              CommandRouter.dispatch(ctx.player.id, "get bent coin from service bot")
@@ -73,10 +73,9 @@ defmodule LineCore.ContainerVerbsTest do
       Object.create(:item, "bag", %{parent_id: ctx.tree.container.id})
 
     {:ok, _} = Object.relate(ctx.player.id, bag.id, :contains)
-    :ok = Object.move(ctx.corpse.id, bag.id)
 
     assert {:error, :containment_cycle} =
-             CommandRouter.dispatch(ctx.player.id, "put bag in corpse")
+             CommandRouter.dispatch(ctx.player.id, "put bag in bag")
 
     assert Object.container_of(bag.id).id == ctx.player.id
   end
