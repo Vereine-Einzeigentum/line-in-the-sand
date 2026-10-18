@@ -12,19 +12,18 @@ defmodule LineCore.Combat do
 
   ## Death
   When `hp_current` drops to or below 0, the actor is "dead". Death events:
-  - Carried items are dropped to the room
-  - Wielded/worn items are unequipped (also dropped)
-  - A "death notice" broadcasts to the room
+  - A persistent `$corpse` container is created in the death room
+  - Carried, wielded, and worn objects are moved into the corpse
+  - A death notice broadcasts to the room
   - The actor is moved to the configured safehouse room
   - HP is restored to max
   - A `dirham_penalty` is deducted from the actor's dirham property
 
   ## Respawn
   Configured via the `SAFEHOUSE_ROOM_ID` env var. If unset, respawn raises.
-  (In production, this is the District 1 safehouse seeded by Step 8.)
   """
 
-  alias LineCore.Object
+  alias LineCore.{Archetypes, Object}
 
   @default_hp_max 50
   @default_dirham_penalty 50
@@ -77,24 +76,24 @@ defmodule LineCore.Combat do
   ## Death event-list builder
 
   @doc """
-  Build the events for killing `victim_id`. Drops carried items, broadcasts
-  death, moves to safehouse, restores HP, applies dirham penalty.
+  Build the events for killing `victim_id`.
 
-  Returns a list of dispatcher events.
+  The body that receives commands is respawned; the material state left behind
+  is a normal persistent `$corpse -> $container` object. The corpse has no
+  special loot table: former inventory and equipment are simply its contents.
   """
-  def death_events(victim_id, opts \\ []) do
+  def death_events(victim_id, opts \ []) do
     safehouse_id = opts[:safehouse_id] || safehouse_room_id()
     penalty = opts[:dirham_penalty] || @default_dirham_penalty
     {_current, max_hp} = hp(victim_id)
 
     victim = Object.get(victim_id)
-
-    drop_events = drop_carried_events(victim_id, victim)
+    room = Object.container_of(victim_id)
 
     current_dirham = Object.get_property(victim_id, "dirham", 0)
     new_dirham = max(0, current_dirham - penalty)
 
-    drop_events ++
+    corpse_events(victim_id, victim, room) ++
       [
         {:notify_room, "[death] #{victim.name}"},
         {:move, victim_id, safehouse_id, :contains},
@@ -106,41 +105,46 @@ defmodule LineCore.Combat do
 
   ## Helpers
 
-  defp drop_carried_events(victim_id, victim) do
-    carried =
-      victim_id
-      |> Object.contents()
-      |> Enum.filter(&(&1.type == :item))
+  defp corpse_events(_victim_id, _victim, nil), do: []
 
+  defp corpse_events(victim_id, victim, room) do
+    corpse_parent =
+      Archetypes.get(:corpse) ||
+        raise "corpse archetype must be seeded before death handling"
+
+    ref = {:corpse, victim_id}
+    corpse = {:created, ref}
+
+    carried = Object.contents(victim_id)
     equipped = Object.equipped(victim_id)
-    room = Object.container_of(victim_id) || %{id: nil}
 
-    case room.id do
-      nil ->
-        []
+    create_events = [
+      {:create_object, ref,
+       %{
+         type: :item,
+         name: "corpse of #{victim.name}",
+         description: "The remains of #{victim.name}.",
+         parent_id: corpse_parent.id
+       }},
+      {:relate, room.id, corpse, :contains},
+      {:set_property, corpse, "corpse_of", victim_id},
+      {:set_property, corpse, "former_name", victim.name}
+    ]
 
-      room_id ->
-        carry_drops =
-          Enum.flat_map(carried, fn item ->
-            [
-              {:move, item.id, room_id, :contains},
-              {:notify_room, "[death] #{victim.name} drops #{item.name}",
-               except: [victim_id]}
-            ]
-          end)
+    carry_events =
+      Enum.map(carried, fn object ->
+        {:move, object.id, corpse, :contains}
+      end)
 
-        equip_drops =
-          Enum.flat_map(equipped, fn {rel_type, item} ->
-            [
-              {:unrelate, victim_id, item.id, rel_type},
-              {:relate, room_id, item.id, :contains},
-              {:notify_room, "[death] #{victim.name} drops #{item.name}",
-               except: [victim_id]}
-            ]
-          end)
+    equipment_events =
+      Enum.flat_map(equipped, fn {rel_type, object} ->
+        [
+          {:unrelate, victim_id, object.id, rel_type},
+          {:relate, corpse, object.id, :contains}
+        ]
+      end)
 
-        carry_drops ++ equip_drops
-    end
+    create_events ++ carry_events ++ equipment_events
   end
 
   defp safehouse_room_id do
