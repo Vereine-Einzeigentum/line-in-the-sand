@@ -68,7 +68,41 @@ defmodule LineCore.ContainerVerbsTest do
     assert Object.container_of(ctx.coin.id).id == robot_corpse.id
   end
 
-  test "containment cycles are rejected", ctx do
+  test "numbered references distinguish same-named containers", ctx do
+    {:ok, bag1} =
+      Object.create(:item, "bag", %{parent_id: ctx.tree.container.id})
+
+    {:ok, bag2} =
+      Object.create(:item, "bag", %{parent_id: ctx.tree.container.id})
+
+    {:ok, _} = Object.relate(ctx.player.id, bag1.id, :contains)
+    {:ok, _} = Object.relate(ctx.player.id, bag2.id, :contains)
+
+    assert :ok =
+             CommandRouter.dispatch(ctx.player.id, "put 1.bag in 2.bag")
+
+    assert Object.container_of(bag1.id).id == bag2.id
+    assert Object.container_of(bag2.id).id == ctx.player.id
+  end
+
+  test "numbered references still reject real containment cycles", ctx do
+    {:ok, bag1} =
+      Object.create(:item, "bag", %{parent_id: ctx.tree.container.id})
+
+    {:ok, bag2} =
+      Object.create(:item, "bag", %{parent_id: ctx.tree.container.id})
+
+    {:ok, _} = Object.relate(ctx.player.id, bag1.id, :contains)
+    {:ok, _} = Object.relate(ctx.player.id, bag2.id, :contains)
+
+    assert :ok =
+             CommandRouter.dispatch(ctx.player.id, "put 1.bag in 2.bag")
+
+    assert {:error, :containment_cycle} =
+             CommandRouter.dispatch(ctx.player.id, "put 2.bag in 1.bag")
+  end
+
+  test "putting an object in itself is rejected", ctx do
     {:ok, bag} =
       Object.create(:item, "bag", %{parent_id: ctx.tree.container.id})
 
