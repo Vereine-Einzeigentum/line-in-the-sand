@@ -2,7 +2,7 @@ defmodule LineCore.VerbsTest do
   use ExUnit.Case, async: false
 
   alias LineCore.{Object, Repo, TestHarness}
-  alias LineCore.Verbs.{Go, Get, Drop, Examine, Inventory, Say, Text, Who, Desc}
+  alias LineCore.Verbs.{Go, Get, Drop, Look, Examine, Inventory, Say, Text, Who, Desc}
 
   setup do
     Ecto.Adapters.SQL.Sandbox.checkout(Repo)
@@ -115,7 +115,46 @@ defmodule LineCore.VerbsTest do
     end
   end
 
-  ## Examine
+  ## Look / Examine
+
+  describe "Look" do
+    test "look <object> renders a room object target" do
+      room = TestHarness.spawn_room("Hub")
+      TestHarness.spawn_item_in(room, "brass key", %{description: "Warm from somebody's hand."})
+      player = TestHarness.spawn_player_in(room, "Alice")
+
+      TestHarness.dispatch(player, Look, ["brass key"])
+      msg = TestHarness.assert_msg(~r/brass key/i)
+      assert msg =~ "Warm from somebody's hand."
+    end
+
+    test "look self resolves the actor as an object target" do
+      room = TestHarness.spawn_room("Hub")
+      player = TestHarness.spawn_player_in(room, "Alice")
+      {:ok, _} = Object.set_property(player.id, "custom_description", "Scarred, wired, awake.")
+
+      TestHarness.dispatch(player, Look, ["self"])
+      msg = TestHarness.assert_msg(~r/Alice/)
+      assert msg =~ "Scarred, wired, awake."
+    end
+
+    test "look me is an alias for self" do
+      room = TestHarness.spawn_room("Hub")
+      player = TestHarness.spawn_player_in(room, "Alice")
+
+      TestHarness.dispatch(player, Look, ["me"])
+      TestHarness.assert_msg(~r/Alice/)
+    end
+
+    test "look here resolves the current room object" do
+      room = TestHarness.spawn_room("Adminland", "One tile. No exits.")
+      player = TestHarness.spawn_player_in(room, "Alice")
+
+      TestHarness.dispatch(player, Look, ["here"])
+      msg = TestHarness.assert_msg(~r/Adminland/)
+      assert msg =~ "One tile. No exits."
+    end
+  end
 
   describe "Examine" do
     test "shows the target's full description" do
@@ -225,11 +264,13 @@ defmodule LineCore.VerbsTest do
   ## Who
 
   describe "Who" do
-    test "bare who lists no players when presence is empty" do
+    test "bare who always includes the caller, even before presence registration" do
       room = TestHarness.spawn_room("Hub")
-      player = TestHarness.spawn_player_in(room)
+      player = TestHarness.spawn_player_in(room, "Alice")
+
       TestHarness.dispatch(player, Who, [])
-      TestHarness.assert_msg(~r/No one else is online/)
+
+      TestHarness.assert_msg("[OOC] Online (1): Alice")
     end
 
     test "who <player> reports offline status" do
