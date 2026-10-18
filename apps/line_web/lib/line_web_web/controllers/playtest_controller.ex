@@ -152,7 +152,7 @@ defmodule LineWebWeb.PlaytestController do
         json(conn, %{status: "dispatched", raw: raw})
 
       {:error, reason} ->
-        conn |> put_status(:bad_request) |> json(%{error: inspect(reason)})
+        conn |> put_status(:bad_request) |> json(%{error: command_error(reason)})
     end
   end
 
