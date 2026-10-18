@@ -298,6 +298,16 @@ defmodule LineCore.Object do
 
   ## Name search
 
+  @doc "Find an object anywhere in the live object graph by the same name rules as local resolution."
+  def find_global_by_name(name) when is_binary(name) do
+    from(o in Object,
+      where: is_nil(o.deleted_at),
+      order_by: [asc: o.inserted_at, asc: o.id]
+    )
+    |> Repo.all()
+    |> find_by_name(name)
+  end
+
   @doc """
   Find an object by visible name.
 
