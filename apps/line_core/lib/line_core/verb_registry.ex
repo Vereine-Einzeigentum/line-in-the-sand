@@ -20,7 +20,23 @@ defmodule LineCore.VerbRegistry do
     "attack" => Verbs.Attack,
     "wield" => Verbs.Wield,
     "scrap" => Verbs.Scrap,
-    "sell" => Verbs.Sell
+    "sell" => Verbs.Sell,
+    "score" => Verbs.Score,
+    "skills" => Verbs.Skills,
+    "gear" => Verbs.Gear,
+    "give" => Verbs.Give,
+    "unwield" => Verbs.Unwield,
+    "wear" => Verbs.Wear,
+    "remove_wear" => Verbs.RemoveWear,
+    "open" => Verbs.Open,
+    "close" => Verbs.Close,
+    "lock" => Verbs.Lock,
+    "unlock" => Verbs.Unlock,
+    "home" => Verbs.Home,
+    "sethome" => Verbs.SetHome,
+    "whisper" => Verbs.Whisper,
+    "map" => Verbs.LocalMap,
+    "exits" => Verbs.Exits
   }
 
   def resolve(key) when is_binary(key), do: Map.fetch(@modules, key)
