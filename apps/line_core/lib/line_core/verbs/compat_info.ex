@@ -7,8 +7,9 @@ defmodule LineCore.Verbs.Help do
   home/@sethome, map/lmap, exits, score/sc/stats, skills/sk, gear/eq/equipment,
   wield/unwield, wear/remove, open/close/lock/unlock, help/info/?.
   Moderator building: @create, @dig, @open, @link, @unlink, @move, @recycle,
-  @rename, @describe, @examine/@show, @contents, @parents, @kids, @verbs,
-  @properties, @chparent, @set, @clear, @count, @audit/@owned, @classes, @quota.
+  @rename, @describe, @addalias/@rmalias/@aliases, @examine/@show/@display,
+  @contents, @parent/@parents, @kids, @verbs, @properties, @property/@rmproperty,
+  @chparent, @set, @clear, @count, @audit/@owned, @classes, @quota.
   """
 
   @impl true
@@ -23,7 +24,7 @@ defmodule LineCore.Verbs.Help do
   defp topic(topic) do
     case String.downcase(String.trim(topic)) do
       "building" ->
-        "Moderator building: @create, @dig, @open, @link, @unlink, @move, @recycle, @rename, @describe, @examine/@show, @contents, @parents, @kids, @verbs, @properties, @chparent, @set, @clear, @count, @audit/@owned, @classes, @quota."
+        "Moderator building: @create, @dig, @open, @link, @unlink, @move, @recycle, @rename, @describe, @addalias/@rmalias/@aliases, @examine/@show/@display, @contents, @parent/@parents, @kids, @verbs, @properties, @property/@rmproperty, @chparent, @set, @clear, @count, @audit/@owned, @classes, @quota."
 
       "combat" ->
         "Combat: attack/hit/shoot/stab/slash/punch, wield/unwield, gear, score, skills."
