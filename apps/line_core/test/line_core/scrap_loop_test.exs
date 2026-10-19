@@ -2,7 +2,7 @@ defmodule LineCore.ScrapLoopTest do
   use ExUnit.Case, async: false
 
   alias LineCore.{Object, Repo, TestHarness}
-  alias LineCore.Verbs.{Scrap, Sell, Get, Go, Inventory}
+  alias LineCore.Verbs.{Scrap, Sell, Get, Go}
 
   setup do
     Ecto.Adapters.SQL.Sandbox.checkout(Repo)
