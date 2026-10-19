@@ -16,6 +16,7 @@ defmodule LineCore.Parser do
     "info" => Verbs.Help,
     "information" => Verbs.Help,
     "?" => Verbs.Help,
+    "commands" => Verbs.Help,
     "text" => Verbs.Text,
     "txt" => Verbs.Text,
     "tell" => Verbs.Text,
@@ -30,7 +31,9 @@ defmodule LineCore.Parser do
     "@rmalias" => Verbs.BuilderRmAlias,
     "@aliases" => Verbs.BuilderAliases,
     "@property" => Verbs.BuilderProperty,
+    "@prop" => Verbs.BuilderProperty,
     "@rmproperty" => Verbs.BuilderRmProperty,
+    "@rmprop" => Verbs.BuilderRmProperty,
     "@create" => Verbs.BuilderCreate,
     "@dig" => Verbs.BuilderDig,
     "@open" => Verbs.BuilderOpen,
@@ -56,6 +59,7 @@ defmodule LineCore.Parser do
     "@classes" => Verbs.BuilderClasses,
     "@quota" => Verbs.BuilderQuota,
     "@move" => Verbs.BuilderMove,
+    "@eject" => Verbs.BuilderEject,
     "@recycle" => Verbs.BuilderRecycle,
     "@bare" => Verbs.Bare,
     "@gender" => Verbs.Gender,
@@ -88,7 +92,7 @@ defmodule LineCore.Parser do
         {verb, rest} = split_verb(trimmed)
         verb_down = String.downcase(verb)
 
-        case Map.get(@system_map, verb_down) do
+        case system_module(verb_down) do
           nil ->
             {:ok, command} = parse_world(trimmed)
             {:world, command}
@@ -173,33 +177,7 @@ defmodule LineCore.Parser do
   end
 
   defp build_world_command(verb, rest, raw) when verb in ["look", "l"] do
-    cond do
-      match = Regex.run(~r/^at\s+(.+)$/i, rest) ->
-        [_, target] = match
-
-        %WorldCommand{
-          verb: verb,
-          argstr: rest,
-          dobjstr: String.trim(target),
-          prepstr: "at",
-          raw: raw
-        }
-
-      match = Regex.run(~r/^in(?:side)?\s+(.+)$/i, rest) ->
-        [_, target] = match
-
-        %WorldCommand{
-          verb: verb,
-          argstr: rest,
-          dobjstr: nil,
-          prepstr: "in",
-          iobjstr: String.trim(target),
-          raw: raw
-        }
-
-      true ->
-        generic_world_command(verb, rest, raw)
-    end
+    generic_world_command(verb, rest, raw)
   end
 
   defp build_world_command(verb, rest, raw) do
@@ -207,7 +185,7 @@ defmodule LineCore.Parser do
   end
 
   defp generic_world_command(verb, rest, raw) do
-    case split_preposition(rest) do
+    case split_preposition(rest) || split_leading_preposition(rest) do
       {dobj, prep, iobj} ->
         %WorldCommand{
           verb: verb,
@@ -232,7 +210,7 @@ defmodule LineCore.Parser do
 
   defp split_preposition(rest) do
     pattern =
-      ~r/^(.+?)\s+(to|at|in|inside|into|on|onto|upon|with|using|from|out of|from inside|off|off of)\s+(.+)$/i
+      ~r/^(.+?)\s+(in front of|on top of|from inside|out of|off of|underneath|beneath|inside|into|onto|upon|using|with|through|under|behind|beside|about|for|over|from|off|on|in|at|to|is|as)\s+(.+)$/i
 
     case Regex.run(pattern, rest) do
       [_, dobj, prep, iobj] ->
@@ -243,13 +221,31 @@ defmodule LineCore.Parser do
     end
   end
 
+  defp split_leading_preposition(""), do: nil
+
+  defp split_leading_preposition(rest) do
+    pattern =
+      ~r/^(in front of|on top of|from inside|out of|off of|underneath|beneath|inside|into|onto|upon|using|with|through|under|behind|beside|about|for|over|from|off|on|in|at|to|is|as)\s+(.+)$/i
+
+    case Regex.run(pattern, rest) do
+      [_, prep, iobj] ->
+        {nil, canonical_prep(prep), String.trim(iobj)}
+
+      _ ->
+        nil
+    end
+  end
+
   defp canonical_prep(prep) do
     case String.downcase(prep) do
       p when p in ["inside", "into", "in"] -> "in"
-      p when p in ["onto", "upon", "on"] -> "on"
+      p when p in ["on top of", "onto", "upon", "on"] -> "on"
       p when p in ["using", "with"] -> "with"
       p when p in ["out of", "from inside", "from"] -> "from"
       p when p in ["off of", "off"] -> "off"
+      p when p in ["underneath", "beneath", "under"] -> "under"
+      p when p in ["about", "for"] -> "for"
+      "in front of" -> "in front of"
       other -> other
     end
   end
@@ -357,6 +353,27 @@ defmodule LineCore.Parser do
     case String.trim(value) do
       "" -> nil
       text -> text
+    end
+  end
+
+  defp system_module(verb) do
+    case Map.fetch(@system_map, verb) do
+      {:ok, module} ->
+        module
+
+      :error ->
+        if String.starts_with?(verb, "@") do
+          matches =
+            @system_map
+            |> Enum.filter(fn {name, _module} -> String.starts_with?(name, verb) end)
+            |> Enum.map(fn {_name, module} -> module end)
+            |> Enum.uniq()
+
+          case matches do
+            [module] -> module
+            _ -> nil
+          end
+        end
     end
   end
 
