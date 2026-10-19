@@ -123,4 +123,16 @@ defmodule LineCore.ObjectVerbDispatchTest do
     assert match.verb_name == "look"
     assert match.defined_on.id == tree.root.id
   end
+  test "ordinary verb names support two-character MOO abbreviation while dot socials bypass it" do
+    room = TestHarness.spawn_room("Hub")
+    alice = TestHarness.spawn_player_in(room, "Alice")
+    bob = TestHarness.spawn_player_in(room, "Bob")
+
+    assert {:ok, command} = Parser.parse_world("hi Bob")
+    assert {:ok, match} = VerbSearch.resolve(alice.id, command)
+    assert match.verb_name == "attack"
+    assert match.context.dobj.id == bob.id
+
+    assert {:ok, LineCore.Verbs.Social, ["hi"]} = Parser.parse(".hi")
+  end
 end
