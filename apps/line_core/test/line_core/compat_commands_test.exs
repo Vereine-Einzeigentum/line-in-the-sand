@@ -403,6 +403,49 @@ defmodule LineCore.CompatCommandsTest do
     assert classes =~ "$clothing"
   end
 
+
+  test "LambdaCore object aliases participate in ordinary resolution", ctx do
+    {:ok, mod} = Object.create(:player, "Mod", %{parent_id: ctx.tree.mod.id})
+    {:ok, _} = Object.relate(ctx.room.id, mod.id, :contains)
+    LineCore.PubSub.subscribe({:actor, mod.id})
+
+    assert :ok = CommandRouter.dispatch(mod.id, "@create $container named satchel,bag,sack")
+    TestHarness.assert_msg(~r/Created satchel/i)
+    satchel = Object.contents(mod.id) |> Object.find_by_name("satchel")
+    assert satchel
+    assert Object.find_by_name(Object.contents(mod.id), "bag").id == satchel.id
+
+    assert :ok = CommandRouter.dispatch(mod.id, "@addalias pouch to satchel")
+    TestHarness.assert_msg(~r/alias.*pouch/i)
+    assert Object.find_by_name(Object.contents(mod.id), "pouch").id == satchel.id
+
+    assert :ok = CommandRouter.dispatch(mod.id, "@aliases satchel")
+    aliases = TestHarness.assert_msg(~r/Aliases/i)
+    assert aliases =~ "bag"
+    assert aliases =~ "sack"
+    assert aliases =~ "pouch"
+
+    assert :ok = CommandRouter.dispatch(mod.id, "@rmalias bag from satchel")
+    TestHarness.assert_msg(~r/removed.*bag/i)
+    assert Object.find_by_name(Object.contents(mod.id), "bag") == nil
+  end
+
+  test "LambdaCore @property and @rmproperty edit owned local properties", ctx do
+    {:ok, mod} = Object.create(:player, "Mod", %{parent_id: ctx.tree.mod.id})
+    {:ok, _} = Object.relate(ctx.room.id, mod.id, :contains)
+    LineCore.PubSub.subscribe({:actor, mod.id})
+
+    assert :ok = CommandRouter.dispatch(mod.id, "@create $item named widget")
+    TestHarness.assert_msg(~r/Created widget/i)
+    widget = Object.contents(mod.id) |> Object.find_by_name("widget")
+
+    assert :ok = CommandRouter.dispatch(mod.id, ~s(@property widget:color "red"))
+    assert Object.get_local_property(widget.id, "color") == "red"
+
+    assert :ok = CommandRouter.dispatch(mod.id, "@rmproperty widget:color")
+    assert Object.get_local_property(widget.id, "color") == nil
+  end
+
   test "ordinary players cannot use moderator builder commands", ctx do
     assert {:error, :permission_denied} =
              CommandRouter.dispatch(ctx.player.id, "@create $container named satchel")
