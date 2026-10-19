@@ -5,8 +5,8 @@ defmodule LineCore.Verbs.Help do
   Commands: look/l, examine/ex, inventory/i, get/take, drop/throw, put/insert,
   give/hand, say, emote/:, whisper, page, who/@who, whereis, go/directions,
   home/@sethome, map/lmap, exits, score/sc/stats, skills/sk, gear/eq/equipment,
-  wield/unwield, wear/remove, open/close/lock/unlock, help/info/?.
-  Moderator building: @create, @dig, @open, @link, @unlink, @move, @recycle,
+  wield/unwield, wear/remove, open/close/lock/unlock, help/info/?/commands.
+  Moderator building: @create, @dig, @open, @link, @unlink, @move, @eject, @recycle,
   @rename, @describe, @addalias/@rmalias/@aliases, @examine/@show/@display,
   @contents, @parent/@parents, @kids, @verbs, @properties, @property/@rmproperty,
   @chparent, @set, @clear, @count, @audit/@owned, @classes, @quota.
@@ -24,7 +24,7 @@ defmodule LineCore.Verbs.Help do
   defp topic(topic) do
     case String.downcase(String.trim(topic)) do
       "building" ->
-        "Moderator building: @create, @dig, @open, @link, @unlink, @move, @recycle, @rename, @describe, @addalias/@rmalias/@aliases, @examine/@show/@display, @contents, @parent/@parents, @kids, @verbs, @properties, @property/@rmproperty, @chparent, @set, @clear, @count, @audit/@owned, @classes, @quota."
+        "Moderator building: @create, @dig, @open, @link, @unlink, @move, @eject, @recycle, @rename, @describe, @addalias/@rmalias/@aliases, @examine/@show/@display, @contents, @parent/@parents, @kids, @verbs, @properties, @property/@prop, @rmproperty/@rmprop, @chparent, @set, @clear, @count, @audit/@owned, @classes, @quota. Unique @command prefixes are accepted when unambiguous."
 
       "combat" ->
         "Combat: attack/hit/shoot/stab/slash/punch, wield/unwield, gear, score, skills."
