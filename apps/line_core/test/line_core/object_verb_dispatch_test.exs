@@ -1,7 +1,7 @@
 defmodule LineCore.ObjectVerbDispatchTest do
   use ExUnit.Case, async: false
 
-  alias LineCore.{Archetypes, CommandRouter, Object, Parser, Repo, TestHarness, VerbSearch}
+  alias LineCore.{Archetypes, CommandRouter, Parser, Repo, TestHarness, VerbSearch}
 
   setup do
     Ecto.Adapters.SQL.Sandbox.checkout(Repo)
