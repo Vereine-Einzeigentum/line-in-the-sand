@@ -1,9 +1,9 @@
 defmodule LineCore.Seed.DistrictOneTest do
   use ExUnit.Case, async: false
 
-  alias LineCore.{Archetypes, Object, Repo, TestHarness}
+  alias LineCore.{Archetypes, Object, Repo}
   alias LineCore.Seed.DistrictOne
-  alias LineCore.Verbs.{Go, Get, Look, Examine, Inventory, Scrap, Sell}
+  alias LineCore.Verbs.{Go, Get, Look, Scrap}
 
   setup do
     Ecto.Adapters.SQL.Sandbox.checkout(Repo)
