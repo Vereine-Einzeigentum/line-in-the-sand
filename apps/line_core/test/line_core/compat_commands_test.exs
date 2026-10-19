@@ -250,6 +250,99 @@ defmodule LineCore.CompatCommandsTest do
     assert Object.owns?(mod.id, exit.id)
   end
 
+
+  test "get all and drop all operate on ordinary room and inventory containment", ctx do
+    a = TestHarness.spawn_item_in(ctx.room, "washer")
+    b = TestHarness.spawn_item_in(ctx.room, "bolt")
+
+    assert :ok = CommandRouter.dispatch(ctx.player.id, "get all")
+    assert Object.container_of(a.id).id == ctx.player.id
+    assert Object.container_of(b.id).id == ctx.player.id
+
+    assert :ok = CommandRouter.dispatch(ctx.player.id, "drop all")
+    assert Object.container_of(a.id).id == ctx.room.id
+    assert Object.container_of(b.id).id == ctx.room.id
+  end
+
+  test "exit objects can be opened, locked, and actually gate movement", ctx do
+    destination = TestHarness.spawn_room("Behind Door")
+    {:ok, exit} =
+      Object.create(:exit, "steel door", %{parent_id: ctx.tree.exit.id})
+
+    {:ok, key} = Object.create(:item, "door key")
+    {:ok, _} = Object.relate(ctx.room.id, exit.id, :contains)
+    {:ok, _} = Object.relate(ctx.player.id, key.id, :contains)
+    {:ok, _} = Object.relate(ctx.room.id, destination.id, :exit_to, %{"direction" => "north"})
+    Object.set_property(exit.id, "direction", "north")
+    Object.set_property(exit.id, "destination_id", destination.id)
+    Object.set_property(exit.id, "open", false)
+    Object.set_property(exit.id, "locked", true)
+    Object.set_property(exit.id, "key_id", key.id)
+
+    assert {:error, :exit_locked} = CommandRouter.dispatch(ctx.player.id, "north")
+    assert :ok = CommandRouter.dispatch(ctx.player.id, "unlock steel door with door key")
+    assert :ok = CommandRouter.dispatch(ctx.player.id, "open steel door")
+    assert :ok = CommandRouter.dispatch(ctx.player.id, "north")
+    assert Object.container_of(ctx.player.id).id == destination.id
+  end
+
+  test "moderator @open creates an exit and builder introspection sees ordinary object state", ctx do
+    destination = TestHarness.spawn_room("Destination")
+    {:ok, mod} = Object.create(:player, "Mod", %{parent_id: ctx.tree.mod.id})
+    {:ok, _} = Object.relate(ctx.room.id, mod.id, :contains)
+    LineCore.PubSub.subscribe({:actor, mod.id})
+
+    assert :ok = CommandRouter.dispatch(mod.id, "@open east to Destination")
+    TestHarness.assert_msg(~r/(Opened|Dug) exit east/i)
+    assert %{id: destination_id} = Object.resolve_exit(ctx.room.id, "east")
+    assert destination_id == destination.id
+
+    assert :ok = CommandRouter.dispatch(mod.id, "@create $container named satchel")
+    TestHarness.assert_msg(~r/Created satchel/i)
+    satchel = Object.contents(mod.id) |> Object.find_by_name("satchel")
+    Object.set_property(satchel.id, "open", true)
+
+    assert :ok = CommandRouter.dispatch(mod.id, "@examine satchel")
+    exam = TestHarness.assert_msg(~r/satchel/i)
+    assert exam =~ satchel.id
+    assert exam =~ "$container"
+
+    assert :ok = CommandRouter.dispatch(mod.id, "@contents me")
+    TestHarness.assert_msg(~r/satchel/i)
+
+    assert :ok = CommandRouter.dispatch(mod.id, "@parents satchel")
+    TestHarness.assert_msg(~r/\$container.*\$item.*\$root/is)
+
+    assert :ok = CommandRouter.dispatch(mod.id, "@properties satchel")
+    TestHarness.assert_msg(~r/open.*true/is)
+
+    assert :ok = CommandRouter.dispatch(mod.id, "@verbs satchel")
+    TestHarness.assert_msg(~r/put.*open.*lock/is)
+
+    assert :ok = CommandRouter.dispatch(mod.id, "@owned")
+    TestHarness.assert_msg(~r/satchel/i)
+  end
+
+  test "moderator can chparent owned objects and edit local properties", ctx do
+    {:ok, mod} = Object.create(:player, "Mod", %{parent_id: ctx.tree.mod.id})
+    {:ok, _} = Object.relate(ctx.room.id, mod.id, :contains)
+    LineCore.PubSub.subscribe({:actor, mod.id})
+
+    assert :ok = CommandRouter.dispatch(mod.id, "@create $item named crate")
+    TestHarness.assert_msg(~r/Created crate/i)
+    crate = Object.contents(mod.id) |> Object.find_by_name("crate")
+    assert crate.parent_id == ctx.tree.item.id
+
+    assert :ok = CommandRouter.dispatch(mod.id, "@chparent crate to $container")
+    assert Object.get(crate.id).parent_id == ctx.tree.container.id
+
+    assert :ok = CommandRouter.dispatch(mod.id, "@set crate.open to false")
+    assert Object.get_local_property(crate.id, "open") == false
+
+    assert :ok = CommandRouter.dispatch(mod.id, "@clear crate.open")
+    assert Object.get_local_property(crate.id, "open") == nil
+  end
+
   test "ordinary players cannot use moderator builder commands", ctx do
     assert {:error, :permission_denied} =
              CommandRouter.dispatch(ctx.player.id, "@create $container named satchel")
