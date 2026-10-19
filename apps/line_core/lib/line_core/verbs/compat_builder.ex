@@ -281,7 +281,7 @@ defmodule LineCore.Verbs.BuilderMove do
   @impl true
   def execute(ctx, [object_name, destination_name]) do
     with :ok <- Builder.require(ctx.actor),
-         {:ok, object} <- Builder.resolve_owned(ctx, object_name),
+         {:ok, object} <- Builder.resolve_mutable(ctx, object_name),
          destination when not is_nil(destination) <- Builder.resolve_any(ctx, destination_name) do
       {:ok,
        [
@@ -645,4 +645,97 @@ defmodule LineCore.Verbs.BuilderClear do
   end
 
   def execute(_ctx, _args), do: {:error, :bad_args}
+end
+
+
+defmodule LineCore.Verbs.BuilderLink do
+  @behaviour LineCore.Verb
+
+  alias LineCore.{Archetypes, Builder, Object}
+
+  @impl true
+  def execute(ctx, [exit_name, destination_name]) do
+    with :ok <- Builder.require(ctx.actor),
+         {:ok, exit} <- Builder.resolve_owned(ctx, exit_name),
+         :ok <- ensure_exit(exit),
+         source when not is_nil(source) <- Object.container_of(exit.id),
+         destination when not is_nil(destination) <- Builder.resolve_any(ctx, destination_name),
+         :ok <- ensure_room(destination),
+         direction when is_binary(direction) <- Object.get_property(exit.id, "direction") do
+      old_destination_id = Object.get_property(exit.id, "destination_id")
+
+      unlink =
+        if is_binary(old_destination_id),
+          do: [{:unrelate, source.id, old_destination_id, :exit_to}],
+          else: []
+
+      {:ok,
+       unlink ++
+         [
+           {:set_property, exit.id, "destination_id", destination.id},
+           {:relate, source.id, destination.id, :exit_to, %{"direction" => direction}},
+           {:notify_actor, "Linked #{exit.name} to #{destination.name}."}
+         ]}
+    else
+      nil -> {:error, :not_found}
+      false -> {:error, :exit_has_no_direction}
+      {:error, _} = error -> error
+    end
+  end
+
+  def execute(_ctx, _args), do: {:error, :bad_args}
+
+  defp ensure_exit(object) do
+    root = Archetypes.get(:exit)
+
+    if root && (object.id == root.id or Object.descendant_of?(object.id, root.id)),
+      do: :ok,
+      else: {:error, :not_an_exit}
+  end
+
+  defp ensure_room(object) do
+    root = Archetypes.get(:room)
+
+    if root && (object.id == root.id or Object.descendant_of?(object.id, root.id)),
+      do: :ok,
+      else: {:error, :destination_not_room}
+  end
+end
+
+defmodule LineCore.Verbs.BuilderUnlink do
+  @behaviour LineCore.Verb
+
+  alias LineCore.{Archetypes, Builder, Object}
+
+  @impl true
+  def execute(ctx, [exit_name]) do
+    with :ok <- Builder.require(ctx.actor),
+         {:ok, exit} <- Builder.resolve_owned(ctx, String.trim(exit_name)),
+         :ok <- ensure_exit(exit),
+         source when not is_nil(source) <- Object.container_of(exit.id),
+         destination_id when is_binary(destination_id) <-
+           Object.get_property(exit.id, "destination_id") do
+      {:ok,
+       [
+         {:unrelate, source.id, destination_id, :exit_to},
+         {:delete_property, exit.id, "destination_id"},
+         {:notify_actor, "Unlinked #{exit.name}."}
+       ]}
+    else
+      nil -> {:error, :not_found}
+      false -> {:error, :not_linked}
+      {:error, _} = error -> error
+      _ -> {:error, :not_linked}
+    end
+  end
+
+  def execute(_ctx, _args), do: {:error, :bad_args}
+
+  defp ensure_exit(object) do
+    root = Archetypes.get(:exit)
+
+    if root && (object.id == root.id or Object.descendant_of?(object.id, root.id)),
+      do: :ok,
+      else: {:error, :not_an_exit}
+  end
 end
