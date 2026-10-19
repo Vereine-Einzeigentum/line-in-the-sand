@@ -280,6 +280,24 @@ defmodule LineCore.Object do
     |> Repo.all()
   end
 
+  @doc "Resolve the physical exit object for a direction when the room has one."
+  def resolve_exit_object(room_id, direction) do
+    canonical = canonicalize_direction(direction)
+
+    case LineCore.Archetypes.get(:exit) do
+      nil ->
+        nil
+
+      exit_root ->
+        room_id
+        |> contents()
+        |> Enum.find(fn object ->
+          (object.id == exit_root.id or descendant_of?(object.id, exit_root.id)) and
+            get_property(object.id, "direction") == canonical
+        end)
+    end
+  end
+
   @doc "Resolve an exit direction (e.g. 'n', 'north') from a room. Returns destination room object or nil."
   def resolve_exit(room_id, direction) do
     canonical = canonicalize_direction(direction)
