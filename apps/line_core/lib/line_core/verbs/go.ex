@@ -38,6 +38,8 @@ defmodule LineCore.Verbs.Go do
     end
   end
 
+  def execute(_ctx, _args), do: {:error, :bad_args}
+
   defp traversable_exit(room_id, direction) do
     case Object.resolve_exit_object(room_id, direction) do
       nil ->
@@ -57,5 +59,4 @@ defmodule LineCore.Verbs.Go do
     end
   end
 
-  def execute(_ctx, _args), do: {:error, :bad_args}
 end
