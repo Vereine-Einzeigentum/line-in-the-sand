@@ -177,7 +177,19 @@ defmodule LineCore.Parser do
   end
 
   defp build_world_command(verb, rest, raw) when verb in ["look", "l"] do
-    generic_world_command(verb, rest, raw)
+    case Regex.run(~r/^at\s+(.+)$/i, rest) do
+      [_, target] ->
+        %WorldCommand{
+          verb: verb,
+          argstr: rest,
+          dobjstr: String.trim(target),
+          prepstr: "at",
+          raw: raw
+        }
+
+      _ ->
+        generic_world_command(verb, rest, raw)
+    end
   end
 
   defp build_world_command(verb, rest, raw) do
