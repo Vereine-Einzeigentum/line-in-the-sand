@@ -29,8 +29,9 @@ defmodule LineCore.JournalTest do
     def execute(_, _), do: {:error, {:denied, "private diagnostic payload"}}
   end
 
-  setup do
-    Ecto.Adapters.SQL.Sandbox.checkout(Repo)
+  setup tags do
+    # Concurrent workers need committed fixtures and independent transactions.
+    Ecto.Adapters.SQL.Sandbox.checkout(Repo, sandbox: !tags[:unboxed])
     Ecto.Adapters.SQL.Sandbox.mode(Repo, :auto)
     {:ok, room} = Object.create(:room, "Journal room")
     {:ok, actor} = Object.create(:player, "Journal player")
@@ -132,6 +133,7 @@ defmodule LineCore.JournalTest do
     assert Object.get_property(other.id, "count") == nil
   end
 
+  @tag :unboxed
   test "concurrent commands share committed actor order and cannot lose read-modify-write", ctx do
     tasks =
       for _ <- 1..6,
