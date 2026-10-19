@@ -57,6 +57,40 @@ defmodule LineCore.Verbs.Get do
     end
   end
 
+  def execute(ctx, ["all", _container_name]) do
+    container = ctx.iobj
+
+    cond do
+      is_nil(container) ->
+        {:error, :not_found}
+
+      true ->
+        with :ok <- Container.accessible?(container.id) do
+          items =
+            container.id
+            |> Object.contents()
+            |> Enum.filter(&(&1.type == :item))
+
+          case items do
+            [] ->
+              {:error, :not_found}
+
+            _ ->
+              moves = Enum.map(items, &{:move, &1.id, ctx.actor.id, :contains})
+              names = Enum.map_join(items, ", ", & &1.name)
+
+              {:ok,
+               moves ++
+                 [
+                   {:notify_actor, "You take from the #{container.name}: #{names}."},
+                   {:notify_room, "#{ctx.actor.name} takes several things from the #{container.name}.",
+                    except: [ctx.actor.id]}
+                 ]}
+          end
+        end
+    end
+  end
+
   def execute(ctx, [_item_name, _container_name]) do
     item = ctx.dobj
     container = ctx.iobj
