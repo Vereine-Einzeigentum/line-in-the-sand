@@ -1,7 +1,7 @@
 defmodule LineWebWeb.PlayerChannelTest do
   use LineWebWeb.ChannelCase, async: false
 
-  alias LineCore.{Archetypes, Object, Repo, TestHarness}
+  alias LineCore.{Archetypes, Repo, TestHarness}
   alias LineWebWeb.{PlayerChannel, PlayerSocket}
 
   setup do
