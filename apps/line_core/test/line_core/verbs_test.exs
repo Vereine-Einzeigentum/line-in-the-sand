@@ -2,7 +2,21 @@ defmodule LineCore.VerbsTest do
   use ExUnit.Case, async: false
 
   alias LineCore.{Object, Repo, TestHarness}
-  alias LineCore.Verbs.{Go, Get, Drop, Look, Examine, Inventory, Say, Emote, Social, Text, Who, Desc}
+
+  alias LineCore.Verbs.{
+    Go,
+    Get,
+    Drop,
+    Look,
+    Examine,
+    Inventory,
+    Say,
+    Emote,
+    Social,
+    Text,
+    Who,
+    Desc
+  }
 
   setup do
     Ecto.Adapters.SQL.Sandbox.checkout(Repo)

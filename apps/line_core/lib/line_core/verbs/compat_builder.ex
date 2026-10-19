@@ -18,10 +18,17 @@ defmodule LineCore.Builder do
     normalized = name |> String.trim() |> String.downcase()
 
     case normalized do
-      "me" -> ctx.actor
-      "self" -> ctx.actor
-      "here" -> ctx.room
-      _ -> archetype(normalized) || Resolver.visible(ctx, name) || Object.find_global_by_name(name)
+      "me" ->
+        ctx.actor
+
+      "self" ->
+        ctx.actor
+
+      "here" ->
+        ctx.room
+
+      _ ->
+        archetype(normalized) || Resolver.visible(ctx, name) || Object.find_global_by_name(name)
     end
   end
 
@@ -129,8 +136,7 @@ defmodule LineCore.Verbs.BuilderCreate do
 
       {:ok,
        [
-         {:create_object, ref,
-          %{type: :item, name: name, parent_id: parent.id}},
+         {:create_object, ref, %{type: :item, name: name, parent_id: parent.id}},
          {:relate, ctx.actor.id, {:created, ref}, :contains},
          {:relate, ctx.actor.id, {:created, ref}, :owns}
        ] ++
@@ -158,8 +164,7 @@ defmodule LineCore.Verbs.BuilderDig do
 
       {:ok,
        [
-         {:create_object, ref,
-          %{type: :room, name: String.trim(name), parent_id: parent.id}},
+         {:create_object, ref, %{type: :room, name: String.trim(name), parent_id: parent.id}},
          {:relate, ctx.actor.id, {:created, ref}, :owns},
          {:notify_actor, "Dug room #{String.trim(name)}."}
        ]}
@@ -251,8 +256,12 @@ defmodule LineCore.Verbs.BuilderAudit do
 
       text =
         case owned do
-          [] -> "#{target.name} owns no objects."
-          _ -> "Objects owned by #{target.name}:\n" <> Enum.map_join(owned, "\n", &"  #{&1.name} [#{&1.id}]")
+          [] ->
+            "#{target.name} owns no objects."
+
+          _ ->
+            "Objects owned by #{target.name}:\n" <>
+              Enum.map_join(owned, "\n", &"  #{&1.name} [#{&1.id}]")
         end
 
       {:ok, [{:notify_actor, text}]}
@@ -346,7 +355,6 @@ defmodule LineCore.Verbs.BuilderRecycle do
   def execute(_ctx, _args), do: {:error, :bad_args}
 end
 
-
 defmodule LineCore.Verbs.BuilderOpen do
   @behaviour LineCore.Verb
 
@@ -416,8 +424,12 @@ defmodule LineCore.Verbs.BuilderContents do
 
       text =
         case contents do
-          [] -> "#{object.name} contains nothing."
-          _ -> "#{object.name} contains:\n" <> Enum.map_join(contents, "\n", &"  #{&1.name} [#{&1.id}]")
+          [] ->
+            "#{object.name} contains nothing."
+
+          _ ->
+            "#{object.name} contains:\n" <>
+              Enum.map_join(contents, "\n", &"  #{&1.name} [#{&1.id}]")
         end
 
       {:ok, [{:notify_actor, text}]}
@@ -470,8 +482,12 @@ defmodule LineCore.Verbs.BuilderKids do
 
       text =
         case kids do
-          [] -> "#{object.name} has no children."
-          _ -> "Children of #{object.name}:\n" <> Enum.map_join(kids, "\n", &"  #{&1.name} [#{&1.id}]")
+          [] ->
+            "#{object.name} has no children."
+
+          _ ->
+            "Children of #{object.name}:\n" <>
+              Enum.map_join(kids, "\n", &"  #{&1.name} [#{&1.id}]")
         end
 
       {:ok, [{:notify_actor, text}]}
@@ -638,14 +654,26 @@ defmodule LineCore.Verbs.BuilderSet do
     value = String.trim(raw)
 
     cond do
-      String.downcase(value) == "true" -> true
-      String.downcase(value) == "false" -> false
-      String.downcase(value) in ["nil", "null", "none"] -> nil
-      Regex.match?(~r/^-?\d+$/, value) -> String.to_integer(value)
-      Regex.match?(~r/^-?\d+\.\d+$/, value) -> String.to_float(value)
+      String.downcase(value) == "true" ->
+        true
+
+      String.downcase(value) == "false" ->
+        false
+
+      String.downcase(value) in ["nil", "null", "none"] ->
+        nil
+
+      Regex.match?(~r/^-?\d+$/, value) ->
+        String.to_integer(value)
+
+      Regex.match?(~r/^-?\d+\.\d+$/, value) ->
+        String.to_float(value)
+
       String.starts_with?(value, ~s(")) and String.ends_with?(value, ~s(")) ->
         value |> String.trim_leading(~s(")) |> String.trim_trailing(~s("))
-      true -> value
+
+      true ->
+        value
     end
   end
 end
@@ -675,7 +703,6 @@ defmodule LineCore.Verbs.BuilderClear do
 
   def execute(_ctx, _args), do: {:error, :bad_args}
 end
-
 
 defmodule LineCore.Verbs.BuilderLink do
   @behaviour LineCore.Verb
@@ -768,7 +795,6 @@ defmodule LineCore.Verbs.BuilderUnlink do
       else: {:error, :not_an_exit}
   end
 end
-
 
 defmodule LineCore.Verbs.BuilderAddAlias do
   @behaviour LineCore.Verb
@@ -888,14 +914,26 @@ defmodule LineCore.Verbs.BuilderProperty do
     value = String.trim(raw)
 
     cond do
-      String.downcase(value) == "true" -> true
-      String.downcase(value) == "false" -> false
-      String.downcase(value) in ["nil", "null", "none"] -> nil
-      Regex.match?(~r/^-?\d+$/, value) -> String.to_integer(value)
-      Regex.match?(~r/^-?\d+\.\d+$/, value) -> String.to_float(value)
+      String.downcase(value) == "true" ->
+        true
+
+      String.downcase(value) == "false" ->
+        false
+
+      String.downcase(value) in ["nil", "null", "none"] ->
+        nil
+
+      Regex.match?(~r/^-?\d+$/, value) ->
+        String.to_integer(value)
+
+      Regex.match?(~r/^-?\d+\.\d+$/, value) ->
+        String.to_float(value)
+
       String.starts_with?(value, ~s(")) and String.ends_with?(value, ~s(")) ->
         value |> String.trim_leading(~s(")) |> String.trim_trailing(~s("))
-      true -> value
+
+      true ->
+        value
     end
   end
 end
@@ -926,7 +964,6 @@ defmodule LineCore.Verbs.BuilderRmProperty do
   def execute(_ctx, _args), do: {:error, :bad_args}
 end
 
-
 defmodule LineCore.Verbs.BuilderEject do
   @behaviour LineCore.Verb
 
@@ -936,7 +973,8 @@ defmodule LineCore.Verbs.BuilderEject do
   def execute(ctx, [spec]) when is_binary(spec) do
     with :ok <- Builder.require(ctx.actor),
          {:ok, target_name, source} <- parse_target_and_source(ctx, spec),
-         target when not is_nil(target) <- Object.find_by_name(Object.contents(source.id), target_name) do
+         target when not is_nil(target) <-
+           Object.find_by_name(Object.contents(source.id), target_name) do
       events =
         case valid_home(target) do
           nil ->

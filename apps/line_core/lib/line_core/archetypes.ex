@@ -118,7 +118,7 @@ defmodule LineCore.Archetypes do
             set_parent!(object, desired)
 
           object.type == :player and
-              Object.get_property(object.id, "admin") == true and
+            Object.get_property(object.id, "admin") == true and
               object.parent_id == tree.pc.id ->
             set_parent!(object, tree.mod.id)
 
@@ -271,49 +271,346 @@ defmodule LineCore.Archetypes do
 
   defp install_verbs!(tree) do
     definitions = [
-      {tree.root, %{name: "look", aliases: ["l"], module: "look", dobj: "any", prep: "any", iobj: "any", arg_mode: "target_optional"}},
-      {tree.root, %{name: "examine", aliases: ["ex", "exam", "x"], module: "examine", dobj: "any", prep: "any", iobj: "any", arg_mode: "target_required"}},
-      {tree.root, %{name: "get", aliases: ["grab", "gather", "pickup", "take"], module: "get", dobj: "any", prep: "none", iobj: "none", arg_mode: "target_required"}},
-      {tree.root, %{name: "drop", aliases: ["leave", "discard", "throw"], module: "drop", dobj: "any", prep: "none", iobj: "none", arg_mode: "target_required"}},
-      {tree.root, %{name: "say", aliases: [], module: "say", dobj: "any", prep: "any", iobj: "any", arg_mode: "rest"}},
-      {tree.root, %{name: "emote", aliases: [], module: "emote", dobj: "any", prep: "any", iobj: "any", arg_mode: "rest"}},
-
-      {tree.room, %{name: "go", aliases: ["move"], module: "go", dobj: "none", prep: "none", iobj: "none", arg_mode: "rest"}},
-
-      {tree.exit, %{name: "open", aliases: [], module: "open", dobj: "this", prep: "none", iobj: "none", arg_mode: "target_required"}},
-      {tree.exit, %{name: "close", aliases: [], module: "close", dobj: "this", prep: "none", iobj: "none", arg_mode: "target_required"}},
-      {tree.exit, %{name: "lock", aliases: [], module: "lock", dobj: "this", prep: "with", iobj: "any", arg_mode: "object_pair"}},
-      {tree.exit, %{name: "unlock", aliases: [], module: "unlock", dobj: "this", prep: "with", iobj: "any", arg_mode: "object_pair"}},
-
-      {tree.motile, %{name: "inventory", aliases: ["inv", "i"], module: "inventory", dobj: "none", prep: "none", iobj: "none", arg_mode: "none"}},
-      {tree.motile, %{name: "score", aliases: ["sc", "stats"], module: "score", dobj: "none", prep: "none", iobj: "none", arg_mode: "none"}},
-      {tree.motile, %{name: "skills", aliases: ["sk"], module: "skills", dobj: "none", prep: "none", iobj: "none", arg_mode: "none"}},
-      {tree.motile, %{name: "gear", aliases: ["eq", "equipment"], module: "gear", dobj: "none", prep: "none", iobj: "none", arg_mode: "none"}},
-      {tree.motile, %{name: "home", aliases: [], module: "home", dobj: "none", prep: "none", iobj: "none", arg_mode: "none"}},
-      {tree.motile, %{name: "@sethome", aliases: [], module: "sethome", dobj: "none", prep: "none", iobj: "none", arg_mode: "none"}},
-      {tree.motile, %{name: "map", aliases: ["lmap"], module: "map", dobj: "none", prep: "none", iobj: "none", arg_mode: "none"}},
-      {tree.motile, %{name: "exits", aliases: [], module: "exits", dobj: "none", prep: "none", iobj: "none", arg_mode: "none"}},
-      {tree.motile, %{name: "give", aliases: ["hand"], module: "give", dobj: "any", prep: "to", iobj: "this", arg_mode: "object_pair"}},
-      {tree.motile, %{name: "whisper", aliases: [], module: "whisper", dobj: "any", prep: "to", iobj: "this", arg_mode: "object_pair"}},
-
-      {tree.mob, %{name: "attack", aliases: ["kill", "k", "hit", "stab", "slash", "shoot", "punch"], module: "attack", dobj: "this", prep: "any", iobj: "any", arg_mode: "target_required"}},
-
-      {tree.item, %{name: "scrap", aliases: ["salvage"], module: "scrap", dobj: "this", prep: "none", iobj: "none", arg_mode: "target_required"}},
-
-      {tree.container, %{name: "get", aliases: ["grab", "gather", "pickup", "take", "remove"], module: "get", dobj: "any", prep: "from", iobj: "this", arg_mode: "container_get"}},
-      {tree.container, %{name: "put", aliases: ["place", "insert"], module: "put", dobj: "any", prep: "in", iobj: "this", arg_mode: "container_put"}},
-      {tree.container, %{name: "open", aliases: [], module: "open", dobj: "this", prep: "none", iobj: "none", arg_mode: "target_required"}},
-      {tree.container, %{name: "close", aliases: [], module: "close", dobj: "this", prep: "none", iobj: "none", arg_mode: "target_required"}},
-      {tree.container, %{name: "lock", aliases: [], module: "lock", dobj: "this", prep: "with", iobj: "any", arg_mode: "object_pair"}},
-      {tree.container, %{name: "unlock", aliases: [], module: "unlock", dobj: "this", prep: "with", iobj: "any", arg_mode: "object_pair"}},
-
-      {tree.wieldable, %{name: "wield", aliases: ["hold", "equip"], module: "wield", dobj: "this", prep: "none", iobj: "none", arg_mode: "wield"}},
-      {tree.wieldable, %{name: "unwield", aliases: ["stow"], module: "unwield", dobj: "this", prep: "none", iobj: "none", arg_mode: "target_required"}},
-
-      {tree.clothing, %{name: "wear", aliases: [], module: "wear", dobj: "this", prep: "none", iobj: "none", arg_mode: "target_required"}},
-      {tree.clothing, %{name: "remove", aliases: [], module: "remove_wear", dobj: "this", prep: "none", iobj: "none", arg_mode: "target_required"}},
-
-      {tree.npc, %{name: "sell", aliases: ["fence"], module: "sell", dobj: "any", prep: "any", iobj: "this", arg_mode: "sell"}}
+      {tree.root,
+       %{
+         name: "look",
+         aliases: ["l"],
+         module: "look",
+         dobj: "any",
+         prep: "any",
+         iobj: "any",
+         arg_mode: "target_optional"
+       }},
+      {tree.root,
+       %{
+         name: "examine",
+         aliases: ["ex", "exam", "x"],
+         module: "examine",
+         dobj: "any",
+         prep: "any",
+         iobj: "any",
+         arg_mode: "target_required"
+       }},
+      {tree.root,
+       %{
+         name: "get",
+         aliases: ["grab", "gather", "pickup", "take"],
+         module: "get",
+         dobj: "any",
+         prep: "none",
+         iobj: "none",
+         arg_mode: "target_required"
+       }},
+      {tree.root,
+       %{
+         name: "drop",
+         aliases: ["leave", "discard", "throw"],
+         module: "drop",
+         dobj: "any",
+         prep: "none",
+         iobj: "none",
+         arg_mode: "target_required"
+       }},
+      {tree.root,
+       %{
+         name: "say",
+         aliases: [],
+         module: "say",
+         dobj: "any",
+         prep: "any",
+         iobj: "any",
+         arg_mode: "rest"
+       }},
+      {tree.root,
+       %{
+         name: "emote",
+         aliases: [],
+         module: "emote",
+         dobj: "any",
+         prep: "any",
+         iobj: "any",
+         arg_mode: "rest"
+       }},
+      {tree.room,
+       %{
+         name: "go",
+         aliases: ["move"],
+         module: "go",
+         dobj: "none",
+         prep: "none",
+         iobj: "none",
+         arg_mode: "rest"
+       }},
+      {tree.exit,
+       %{
+         name: "open",
+         aliases: [],
+         module: "open",
+         dobj: "this",
+         prep: "none",
+         iobj: "none",
+         arg_mode: "target_required"
+       }},
+      {tree.exit,
+       %{
+         name: "close",
+         aliases: [],
+         module: "close",
+         dobj: "this",
+         prep: "none",
+         iobj: "none",
+         arg_mode: "target_required"
+       }},
+      {tree.exit,
+       %{
+         name: "lock",
+         aliases: [],
+         module: "lock",
+         dobj: "this",
+         prep: "with",
+         iobj: "any",
+         arg_mode: "object_pair"
+       }},
+      {tree.exit,
+       %{
+         name: "unlock",
+         aliases: [],
+         module: "unlock",
+         dobj: "this",
+         prep: "with",
+         iobj: "any",
+         arg_mode: "object_pair"
+       }},
+      {tree.motile,
+       %{
+         name: "inventory",
+         aliases: ["inv", "i"],
+         module: "inventory",
+         dobj: "none",
+         prep: "none",
+         iobj: "none",
+         arg_mode: "none"
+       }},
+      {tree.motile,
+       %{
+         name: "score",
+         aliases: ["sc", "stats"],
+         module: "score",
+         dobj: "none",
+         prep: "none",
+         iobj: "none",
+         arg_mode: "none"
+       }},
+      {tree.motile,
+       %{
+         name: "skills",
+         aliases: ["sk"],
+         module: "skills",
+         dobj: "none",
+         prep: "none",
+         iobj: "none",
+         arg_mode: "none"
+       }},
+      {tree.motile,
+       %{
+         name: "gear",
+         aliases: ["eq", "equipment"],
+         module: "gear",
+         dobj: "none",
+         prep: "none",
+         iobj: "none",
+         arg_mode: "none"
+       }},
+      {tree.motile,
+       %{
+         name: "home",
+         aliases: [],
+         module: "home",
+         dobj: "none",
+         prep: "none",
+         iobj: "none",
+         arg_mode: "none"
+       }},
+      {tree.motile,
+       %{
+         name: "@sethome",
+         aliases: [],
+         module: "sethome",
+         dobj: "none",
+         prep: "none",
+         iobj: "none",
+         arg_mode: "none"
+       }},
+      {tree.motile,
+       %{
+         name: "map",
+         aliases: ["lmap"],
+         module: "map",
+         dobj: "none",
+         prep: "none",
+         iobj: "none",
+         arg_mode: "none"
+       }},
+      {tree.motile,
+       %{
+         name: "exits",
+         aliases: [],
+         module: "exits",
+         dobj: "none",
+         prep: "none",
+         iobj: "none",
+         arg_mode: "none"
+       }},
+      {tree.motile,
+       %{
+         name: "give",
+         aliases: ["hand"],
+         module: "give",
+         dobj: "any",
+         prep: "to",
+         iobj: "this",
+         arg_mode: "object_pair"
+       }},
+      {tree.motile,
+       %{
+         name: "whisper",
+         aliases: [],
+         module: "whisper",
+         dobj: "any",
+         prep: "to",
+         iobj: "this",
+         arg_mode: "object_pair"
+       }},
+      {tree.mob,
+       %{
+         name: "attack",
+         aliases: ["kill", "k", "hit", "stab", "slash", "shoot", "punch"],
+         module: "attack",
+         dobj: "this",
+         prep: "any",
+         iobj: "any",
+         arg_mode: "target_required"
+       }},
+      {tree.item,
+       %{
+         name: "scrap",
+         aliases: ["salvage"],
+         module: "scrap",
+         dobj: "this",
+         prep: "none",
+         iobj: "none",
+         arg_mode: "target_required"
+       }},
+      {tree.container,
+       %{
+         name: "get",
+         aliases: ["grab", "gather", "pickup", "take", "remove"],
+         module: "get",
+         dobj: "any",
+         prep: "from",
+         iobj: "this",
+         arg_mode: "container_get"
+       }},
+      {tree.container,
+       %{
+         name: "put",
+         aliases: ["place", "insert"],
+         module: "put",
+         dobj: "any",
+         prep: "in",
+         iobj: "this",
+         arg_mode: "container_put"
+       }},
+      {tree.container,
+       %{
+         name: "open",
+         aliases: [],
+         module: "open",
+         dobj: "this",
+         prep: "none",
+         iobj: "none",
+         arg_mode: "target_required"
+       }},
+      {tree.container,
+       %{
+         name: "close",
+         aliases: [],
+         module: "close",
+         dobj: "this",
+         prep: "none",
+         iobj: "none",
+         arg_mode: "target_required"
+       }},
+      {tree.container,
+       %{
+         name: "lock",
+         aliases: [],
+         module: "lock",
+         dobj: "this",
+         prep: "with",
+         iobj: "any",
+         arg_mode: "object_pair"
+       }},
+      {tree.container,
+       %{
+         name: "unlock",
+         aliases: [],
+         module: "unlock",
+         dobj: "this",
+         prep: "with",
+         iobj: "any",
+         arg_mode: "object_pair"
+       }},
+      {tree.wieldable,
+       %{
+         name: "wield",
+         aliases: ["hold", "equip"],
+         module: "wield",
+         dobj: "this",
+         prep: "none",
+         iobj: "none",
+         arg_mode: "wield"
+       }},
+      {tree.wieldable,
+       %{
+         name: "unwield",
+         aliases: ["stow"],
+         module: "unwield",
+         dobj: "this",
+         prep: "none",
+         iobj: "none",
+         arg_mode: "target_required"
+       }},
+      {tree.clothing,
+       %{
+         name: "wear",
+         aliases: [],
+         module: "wear",
+         dobj: "this",
+         prep: "none",
+         iobj: "none",
+         arg_mode: "target_required"
+       }},
+      {tree.clothing,
+       %{
+         name: "remove",
+         aliases: [],
+         module: "remove_wear",
+         dobj: "this",
+         prep: "none",
+         iobj: "none",
+         arg_mode: "target_required"
+       }},
+      {tree.npc,
+       %{
+         name: "sell",
+         aliases: ["fence"],
+         module: "sell",
+         dobj: "any",
+         prep: "any",
+         iobj: "this",
+         arg_mode: "sell"
+       }}
     ]
 
     Enum.each(definitions, fn {owner, definition} ->

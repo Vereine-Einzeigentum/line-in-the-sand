@@ -32,9 +32,7 @@ defmodule LineCore.Release do
           {:ok, adminland} = LineCore.Adminland.ensure()
 
           admin_result =
-            LineCore.BootstrapAdmin.bootstrap_from_env(
-              starting_room_id: adminland.id
-            )
+            LineCore.BootstrapAdmin.bootstrap_from_env(starting_room_id: adminland.id)
 
           case admin_result do
             {:ok, {_state, admin}} ->

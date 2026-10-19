@@ -58,5 +58,4 @@ defmodule LineCore.Verbs.Go do
         end
     end
   end
-
 end

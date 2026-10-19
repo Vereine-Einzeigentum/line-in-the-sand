@@ -95,8 +95,11 @@ defmodule LineWebWeb.AuthController do
   end
 
   defp login_failed(conn) do
-    json_error(conn, 401,
-      "if you forgot your account info, email admin@example.com from the account you registered with")
+    json_error(
+      conn,
+      401,
+      "if you forgot your account info, email admin@example.com from the account you registered with"
+    )
   end
 
   defp generate_temp_password do

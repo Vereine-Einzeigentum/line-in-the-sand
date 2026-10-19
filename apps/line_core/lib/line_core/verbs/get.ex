@@ -83,7 +83,8 @@ defmodule LineCore.Verbs.Get do
                moves ++
                  [
                    {:notify_actor, "You take from the #{container.name}: #{names}."},
-                   {:notify_room, "#{ctx.actor.name} takes several things from the #{container.name}.",
+                   {:notify_room,
+                    "#{ctx.actor.name} takes several things from the #{container.name}.",
                     except: [ctx.actor.id]}
                  ]}
           end

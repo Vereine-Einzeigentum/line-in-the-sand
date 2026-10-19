@@ -99,6 +99,7 @@ defmodule LineCore.Verbs.Skills do
         xp_key = "skill_" <> String.trim_leading(skill.name, "$") <> "_xp"
         xp = Object.get_property(ctx.actor.id, xp_key, 0)
         name = skill.name |> String.trim_leading("$") |> String.capitalize()
+
         "#{name}: #{a + b} (#{String.capitalize(stat_a)} + #{String.capitalize(stat_b)}; XP #{xp})"
       end)
 

@@ -18,7 +18,9 @@ defmodule LineWebWeb.AuthControllerAdminlandTest do
     {:ok, admin} = Object.create(:player, "admin")
     {:ok, _} = Object.relate(elsewhere.id, admin.id, :contains)
     {:ok, _} = Object.set_property(admin.id, "admin", true)
-    {:ok, _} = Object.set_property(admin.id, "password_hash", Bcrypt.hash_pwd_salt("correct horse"))
+
+    {:ok, _} =
+      Object.set_property(admin.id, "password_hash", Bcrypt.hash_pwd_salt("correct horse"))
 
     conn = post(conn, "/api/login", %{"name" => "admin", "password" => "correct horse"})
 
@@ -33,7 +35,9 @@ defmodule LineWebWeb.AuthControllerAdminlandTest do
     {:ok, room} = Object.create(:room, "Player Room")
     {:ok, player} = Object.create(:player, "player")
     {:ok, _} = Object.relate(room.id, player.id, :contains)
-    {:ok, _} = Object.set_property(player.id, "password_hash", Bcrypt.hash_pwd_salt("correct horse"))
+
+    {:ok, _} =
+      Object.set_property(player.id, "password_hash", Bcrypt.hash_pwd_salt("correct horse"))
 
     conn = post(conn, "/api/login", %{"name" => "player", "password" => "correct horse"})
 

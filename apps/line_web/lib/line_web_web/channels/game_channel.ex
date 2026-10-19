@@ -138,7 +138,6 @@ defmodule LineWebWeb.GameChannel do
     end
   end
 
-
   defp format_reason(:unknown_verb), do: "Huh?"
   defp format_reason(:no_such_exit), do: "You can't go that way."
   defp format_reason(:empty_command), do: "empty command"

@@ -38,6 +38,7 @@ defmodule LineCore.ParserTest do
     test "LambdaCore @commands use unique prefix abbreviations and canonical aliases" do
       assert {:ok, Verbs.BuilderClasses, []} = Parser.parse("@cla")
       assert {:ok, Verbs.BuilderParents, ["widget"]} = Parser.parse("@par widget")
+
       assert {:ok, Verbs.BuilderProperty, ["widget:color red"]} =
                Parser.parse("@prop widget:color red")
 
@@ -66,6 +67,7 @@ defmodule LineCore.ParserTest do
                Parser.parse("@bare feet as %P has tiny feet.")
 
       assert {:ok, Verbs.Gender, ["she"]} = Parser.parse("@gender me as she")
+
       assert {:ok, Verbs.Password, ["longpassword"]} =
                Parser.parse("@password me as longpassword")
     end
@@ -84,6 +86,7 @@ defmodule LineCore.ParserTest do
 
     test "game aliases remain strings for object verb matching" do
       assert {:world, %WorldCommand{verb: "l", dobjstr: "crate"}} = Parser.parse("l crate")
+
       assert {:world, %WorldCommand{verb: "take", dobjstr: "knife"}} =
                Parser.parse("take knife")
     end

@@ -57,7 +57,7 @@ defmodule LineCore.Verbs.Unwield do
       ctx.actor.id
       |> Object.equipped()
       |> Enum.filter(fn {type, object} ->
-        type in [:wields_main, :wields_off] and item && object.id == item.id
+        (type in [:wields_main, :wields_off] and item) && object.id == item.id
       end)
 
     case matches do
@@ -143,9 +143,15 @@ defmodule LineCore.Verbs.Open do
     object = ctx.dobj
 
     cond do
-      is_nil(object) -> {:error, :not_found}
-      Object.get_property(object.id, "locked", false) == true -> {:error, :container_locked}
-      Object.get_property(object.id, "open", true) == true -> {:error, :already_open}
+      is_nil(object) ->
+        {:error, :not_found}
+
+      Object.get_property(object.id, "locked", false) == true ->
+        {:error, :container_locked}
+
+      Object.get_property(object.id, "open", true) == true ->
+        {:error, :already_open}
+
       true ->
         {:ok,
          [
@@ -169,8 +175,12 @@ defmodule LineCore.Verbs.Close do
     object = ctx.dobj
 
     cond do
-      is_nil(object) -> {:error, :not_found}
-      Object.get_property(object.id, "open", true) == false -> {:error, :already_closed}
+      is_nil(object) ->
+        {:error, :not_found}
+
+      Object.get_property(object.id, "open", true) == false ->
+        {:error, :already_closed}
+
       true ->
         {:ok,
          [
@@ -214,7 +224,9 @@ defmodule LineCore.Verbs.Lock do
   end
 
   defp keyed_for(object, nil) do
-    if Object.get_property(object.id, "key_id"), do: {:error, :key_required}, else: {:error, :no_key_defined}
+    if Object.get_property(object.id, "key_id"),
+      do: {:error, :key_required},
+      else: {:error, :no_key_defined}
   end
 
   defp keyed_for(object, key) do
@@ -254,7 +266,9 @@ defmodule LineCore.Verbs.Unlock do
   defp present(object), do: {:ok, object}
 
   defp keyed_for(object, nil) do
-    if Object.get_property(object.id, "key_id"), do: {:error, :key_required}, else: {:error, :no_key_defined}
+    if Object.get_property(object.id, "key_id"),
+      do: {:error, :key_required},
+      else: {:error, :no_key_defined}
   end
 
   defp keyed_for(object, key) do

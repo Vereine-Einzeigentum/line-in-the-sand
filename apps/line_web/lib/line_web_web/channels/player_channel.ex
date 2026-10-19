@@ -14,10 +14,14 @@ defmodule LineWebWeb.PlayerChannel do
           :ok = PubSub.subscribe({:actor, player_id})
 
           if Object.get_property(player_id, "temp_password") == true do
-            send(self(), {:system, %{
-              text: "You are using a temporary password. Type: @password me as <newpassword>",
-              kind: "warning"
-            }})
+            send(
+              self(),
+              {:system,
+               %{
+                 text: "You are using a temporary password. Type: @password me as <newpassword>",
+                 kind: "warning"
+               }}
+            )
           end
 
           case Object.container_of(player_id) do

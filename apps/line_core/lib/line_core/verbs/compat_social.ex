@@ -51,8 +51,12 @@ defmodule LineCore.Verbs.Whisper do
     message = strip_quotes(message)
 
     cond do
-      is_nil(target) -> {:error, :not_found}
-      String.trim(message) == "" -> {:error, :whisper_what}
+      is_nil(target) ->
+        {:error, :not_found}
+
+      String.trim(message) == "" ->
+        {:error, :whisper_what}
+
       true ->
         {:ok,
          [

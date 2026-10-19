@@ -392,7 +392,7 @@ defmodule LineCore.Parser do
   def verb_map, do: @system_map
 
   def known_verbs do
-    (@system_map |> Map.values()) ++ [Verbs.Say, Verbs.Emote, Verbs.Social]
+    ((@system_map |> Map.values()) ++ [Verbs.Say, Verbs.Emote, Verbs.Social])
     |> Enum.uniq()
   end
 end

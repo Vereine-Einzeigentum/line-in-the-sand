@@ -50,7 +50,8 @@ defmodule LineCore.Verbs.Put do
                  moves ++
                  [
                    {:notify_actor, "You put in the #{container.name}: #{names}."},
-                   {:notify_room, "#{ctx.actor.name} puts several things in the #{container.name}.",
+                   {:notify_room,
+                    "#{ctx.actor.name} puts several things in the #{container.name}.",
                     except: [ctx.actor.id]}
                  ]}
           end
@@ -85,12 +86,12 @@ defmodule LineCore.Verbs.Put do
 
           {:ok,
            detach ++
-           [
-             {:move, item.id, container.id, :contains},
-             {:notify_actor, "You put the #{item.name} in the #{container.name}."},
-             {:notify_room, "#{ctx.actor.name} puts something in the #{container.name}.",
-              except: [ctx.actor.id]}
-           ]}
+             [
+               {:move, item.id, container.id, :contains},
+               {:notify_actor, "You put the #{item.name} in the #{container.name}."},
+               {:notify_room, "#{ctx.actor.name} puts something in the #{container.name}.",
+                except: [ctx.actor.id]}
+             ]}
         end
     end
   end

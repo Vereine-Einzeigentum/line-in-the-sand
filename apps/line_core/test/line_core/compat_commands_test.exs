@@ -28,7 +28,8 @@ defmodule LineCore.CompatCommandsTest do
     end
   end
 
-  test "score/stats/sc and skills/sk report character state from properties and skill objects", ctx do
+  test "score/stats/sc and skills/sk report character state from properties and skill objects",
+       ctx do
     Object.set_property(ctx.player.id, "stat_wire", 3)
     Object.set_property(ctx.player.id, "stat_shade", 4)
     Object.set_property(ctx.player.id, "dirham", 17)
@@ -252,7 +253,6 @@ defmodule LineCore.CompatCommandsTest do
     assert Object.owns?(mod.id, exit.id)
   end
 
-
   test "get all and drop all operate on ordinary room and inventory containment", ctx do
     a = TestHarness.spawn_item_in(ctx.room, "washer")
     b = TestHarness.spawn_item_in(ctx.room, "bolt")
@@ -268,6 +268,7 @@ defmodule LineCore.CompatCommandsTest do
 
   test "exit objects can be opened, locked, and actually gate movement", ctx do
     destination = TestHarness.spawn_room("Behind Door")
+
     {:ok, exit} =
       Object.create(:exit, "steel door", %{parent_id: ctx.tree.exit.id})
 
@@ -288,7 +289,8 @@ defmodule LineCore.CompatCommandsTest do
     assert Object.container_of(ctx.player.id).id == destination.id
   end
 
-  test "moderator @open creates an exit and builder introspection sees ordinary object state", ctx do
+  test "moderator @open creates an exit and builder introspection sees ordinary object state",
+       ctx do
     destination = TestHarness.spawn_room("Destination")
     {:ok, mod} = Object.create(:player, "Mod", %{parent_id: ctx.tree.mod.id})
     {:ok, _} = Object.relate(ctx.room.id, mod.id, :contains)
@@ -370,7 +372,6 @@ defmodule LineCore.CompatCommandsTest do
     assert Object.get_local_property(crate.id, "open") == nil
   end
 
-
   test "bulk container manipulation supports all", ctx do
     {:ok, box} = Object.create(:item, "box", %{parent_id: ctx.tree.container.id})
     a = TestHarness.spawn_item_in(ctx.player, "washer")
@@ -407,7 +408,6 @@ defmodule LineCore.CompatCommandsTest do
     assert Object.container_of(mod.id).id == b.id
   end
 
-
   test "moderator @classes lists nested archetypes, not only root children", ctx do
     {:ok, mod} = Object.create(:player, "Mod", %{parent_id: ctx.tree.mod.id})
     {:ok, _} = Object.relate(ctx.room.id, mod.id, :contains)
@@ -419,7 +419,6 @@ defmodule LineCore.CompatCommandsTest do
     assert classes =~ "$weapon"
     assert classes =~ "$clothing"
   end
-
 
   test "LambdaCore object aliases participate in ordinary resolution", ctx do
     {:ok, mod} = Object.create(:player, "Mod", %{parent_id: ctx.tree.mod.id})

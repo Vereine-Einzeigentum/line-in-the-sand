@@ -41,6 +41,7 @@ defmodule LineCore.ObjectVerbDispatchTest do
   test "wield is found on direct object's wieldable ancestry", %{tree: tree} do
     room = TestHarness.spawn_room("Hub")
     player = TestHarness.spawn_player_in(room, "Alice")
+
     knife =
       TestHarness.spawn_item_in(player, "knife", %{parent_id: tree.weapon.id})
 
@@ -123,6 +124,7 @@ defmodule LineCore.ObjectVerbDispatchTest do
     assert match.verb_name == "look"
     assert match.defined_on.id == tree.root.id
   end
+
   test "ordinary verb names support two-character MOO abbreviation while dot socials bypass it" do
     room = TestHarness.spawn_room("Hub")
     alice = TestHarness.spawn_player_in(room, "Alice")
