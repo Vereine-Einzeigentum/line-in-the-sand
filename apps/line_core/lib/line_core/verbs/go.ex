@@ -23,17 +23,37 @@ defmodule LineCore.Verbs.Go do
         {:error, :no_such_exit}
 
       dest_room ->
-        canonical = Object.canonicalize_direction(direction)
-        actor_name = ctx.actor.name
+        with :ok <- traversable_exit(ctx.room.id, direction) do
+          canonical = Object.canonicalize_direction(direction)
+          actor_name = ctx.actor.name
+          room_view = Look.room_description(dest_room, ctx.actor.id)
 
-        room_view = Look.room_description(dest_room, ctx.actor.id)
+          {:ok,
+           [
+             {:notify_room, "#{actor_name} leaves #{canonical}.", except: [ctx.actor.id]},
+             {:move, ctx.actor.id, dest_room.id, :contains},
+             {:notify_actor, "You walk #{canonical}.\n\n" <> room_view}
+           ]}
+        end
+    end
+  end
 
-        {:ok,
-         [
-           {:notify_room, "#{actor_name} leaves #{canonical}.", except: [ctx.actor.id]},
-           {:move, ctx.actor.id, dest_room.id, :contains},
-           {:notify_actor, "You walk #{canonical}.\n\n" <> room_view}
-         ]}
+  defp traversable_exit(room_id, direction) do
+    case Object.resolve_exit_object(room_id, direction) do
+      nil ->
+        :ok
+
+      exit ->
+        cond do
+          Object.get_property(exit.id, "locked", false) == true ->
+            {:error, :exit_locked}
+
+          Object.get_property(exit.id, "open", true) == false ->
+            {:error, :exit_closed}
+
+          true ->
+            :ok
+        end
     end
   end
 
