@@ -8,8 +8,7 @@ defmodule LineMl.Application do
   @impl true
   def start(_type, _args) do
     children = [
-      # Starts a worker by calling: LineMl.Worker.start_link(arg)
-      # {LineMl.Worker, arg}
+      {Task.Supervisor, name: LineMl.Tasks}
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html

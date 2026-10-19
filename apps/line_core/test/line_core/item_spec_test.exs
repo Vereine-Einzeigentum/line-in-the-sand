@@ -11,6 +11,34 @@ defmodule LineCore.ItemSpecTest do
     "powered" => false
   }
 
+  test "storage round trips tiers and reads false or completed facts literally" do
+    {:ok, spec} =
+      ItemSpec.new(["Flute"], %{"powered" => false}, unknown: ["name"])
+      |> ItemSpec.put_solved("name", "thunder flute")
+
+    assert {:ok, ^spec} = ItemSpec.from_map(ItemSpec.to_map(spec))
+    assert ItemSpec.get(spec, "powered", true) == false
+    assert ItemSpec.get(spec, "name") == "thunder flute"
+  end
+
+  test "derived and solved tiers cannot contradict each other or rewrite their own facts" do
+    {:ok, spec} = ItemSpec.new(["Thing"]) |> ItemSpec.put_derived("mass", 12)
+    assert {:error, {:semantic_conflict, "mass", 12, 13}} = ItemSpec.put_solved(spec, "mass", 13)
+    assert {:error, {:semantic_conflict, "mass", 12, 14}} = ItemSpec.put_derived(spec, "mass", 14)
+  end
+
+  test "portable boundary rejects executable terms and forged conflicting tiers" do
+    assert :ok = ItemSpec.validate(ItemSpec.new(["Impossible"], @asserted))
+
+    assert {:error, :invalid_facts} =
+             ItemSpec.validate(ItemSpec.new(["Thing"], %{"effect" => fn -> :ok end}))
+
+    spec = %{ItemSpec.new(["Thing"], %{"mass" => 12}) | solved: %{"mass" => 13}}
+    assert {:error, :conflicting_facts} = ItemSpec.validate(spec)
+    spec = %{ItemSpec.new(["Thing"]) | derived: %{"mass" => 12}, unknown: MapSet.new(["mass"])}
+    assert {:error, :resolved_field_marked_unknown} = ItemSpec.validate(spec)
+  end
+
   test "preserves an absurd generated weapon literally" do
     spec =
       ItemSpec.new(

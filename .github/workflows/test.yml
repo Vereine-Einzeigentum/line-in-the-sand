@@ -2,9 +2,9 @@ name: Test
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master, alpha/semantic-spine ]
   pull_request:
-    branches: [ master ]
+    branches: [ master, alpha/semantic-spine ]
 
 jobs:
   test:
@@ -27,24 +27,54 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
     
     - name: Set up Elixir
       uses: erlef/setup-elixir@v1
       with:
-        elixir-version: '1.16'
+        elixir-version: '1.18.4'
         otp-version: '27'
         
     - name: Restore dependencies cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: deps
-        key: ${{ runner.os }}-mix-${{ hashFiles('**/mix.lock') }}
+        key: ${{ runner.os }}-mix-1.18.4-27-${{ hashFiles('**/mix.lock') }}
         restore-keys: ${{ runner.os }}-mix-
         
     - name: Install dependencies
       run: mix deps.get
+
+    - name: Check formatting of changed Elixir files
+      env:
+        BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+      run: |
+        python3 - <<'PY'
+        import os, pathlib, subprocess
+        base = os.environ.get("BASE_SHA", "")
+        if not base or set(base) == {"0"}:
+            base = subprocess.check_output(["git", "hash-object", "-t", "tree", "--stdin"], input=b"").decode().strip()
+        paths = subprocess.check_output(["git", "diff", "--name-only", "--diff-filter=ACMR", "-z", base, "HEAD"]).decode().split("\0")
+        files = [p for p in paths if p.endswith((".ex", ".exs")) and pathlib.Path(p).is_file()]
+        if files:
+            subprocess.run(["mix", "format", "--check-formatted", *files], check=True)
+        PY
+
+    - name: Compile without warnings
+      run: mix compile --warnings-as-errors
+      env:
+        MIX_ENV: test
       
     - name: Run tests
       run: mix test
       env:
         DATABASE_URL: postgresql://postgres:postgres@localhost:5432/line_in_the_sand_test
+
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+
+    - name: Build browser client
+      working-directory: apps/line_web/assets
+      run: npm ci && npm run build

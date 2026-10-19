@@ -34,6 +34,69 @@ defmodule LineCore.Dispatcher do
     dispatch_resolved(actor_id, verb_module, args, raw_command, nil, nil)
   end
 
+  @doc """
+  Evaluate trusted enactment policy and apply its events inside one transaction.
+  Lock the acting object before reading policy. Notifications leave only after
+  commit. This entry point is internal; web clients still use CommandRouter.
+  """
+  def dispatch_transactional(actor_id, verb_module, args, raw_command) do
+    if Repo.in_transaction?() do
+      {:error, :nested_enactment}
+    else
+      do_dispatch_transactional(actor_id, verb_module, args, raw_command)
+    end
+  end
+
+  defp do_dispatch_transactional(actor_id, verb_module, args, raw_command) do
+    import Ecto.Query
+
+    result =
+      Repo.transaction(fn ->
+        actor =
+          Repo.one(
+            from(o in Object,
+              where: o.id == ^actor_id and is_nil(o.deleted_at),
+              lock: "FOR UPDATE"
+            )
+          )
+
+        with actor when not is_nil(actor) <- actor,
+             {:ok, room} <- fetch_room(actor),
+             :ok <- check_requirements(actor, verb_module),
+             context =
+               build_context(
+                 actor,
+                 room,
+                 LineCore.Object.contents(room.id),
+                 raw_command,
+                 nil,
+                 nil
+               ),
+             {:ok, events} <- verb_module.execute(context, args),
+             {:ok, _} <- apply_events(events, context) do
+          {events, context}
+        else
+          nil ->
+            Repo.rollback(:actor_not_found)
+
+          {:error, reason} ->
+            Repo.rollback(reason)
+
+          {:error, operation, reason, _changes} ->
+            Repo.rollback({:event_failed, operation, reason})
+        end
+      end)
+
+    case result do
+      {:ok, {events, context}} ->
+        broadcast_events(events, context)
+        :ok
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
   def dispatch_resolved(actor_id, verb_module, args, raw_command, dobj, iobj) do
     with {:ok, actor} <- fetch_actor(actor_id),
          {:ok, room} <- fetch_room(actor),

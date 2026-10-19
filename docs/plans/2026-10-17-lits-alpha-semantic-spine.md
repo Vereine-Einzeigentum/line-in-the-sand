@@ -31,6 +31,14 @@
 
 ## Alpha acceptance target
 
+### Implemented first path
+
+The item completion boundary, inert materialization consequence, enact/defer/reject
+policy, validated event graph, and transactional item creation are implemented.
+See [semantic-enactment.md](../semantic-enactment.md) for usage, verification,
+and the remaining alpha boundaries. The broader acceptance target below remains
+open; materialization alone does not realize generated combat behavior.
+
 A generated absurd weapon remains mechanically literal; an internally controlled NPC and externally controlled AI PC interact under the same world rules; logic can derive faction/media interest; Elixir can defer/reject/enact those consequences; only the Event Model expands enacted consequences into executable events.
 
 ## Open product seams
