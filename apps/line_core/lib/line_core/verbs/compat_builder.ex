@@ -111,19 +111,31 @@ defmodule LineCore.Verbs.BuilderCreate do
   alias LineCore.Builder
 
   @impl true
-  def execute(ctx, [parent_name, name]) do
+  def execute(ctx, [parent_name, name_spec]) do
     with :ok <- Builder.require(ctx.actor),
          parent when not is_nil(parent) <- Builder.archetype(parent_name) do
+      [name | aliases] =
+        name_spec
+        |> String.split(",")
+        |> Enum.map(&String.trim/1)
+        |> Enum.reject(&(&1 == ""))
+
       ref = {:builder_create, ctx.actor.id, name}
+
+      alias_event =
+        if aliases == [],
+          do: [],
+          else: [{:set_property, {:created, ref}, "aliases", aliases}]
 
       {:ok,
        [
          {:create_object, ref,
-          %{type: :item, name: String.trim(name), parent_id: parent.id}},
+          %{type: :item, name: name, parent_id: parent.id}},
          {:relate, ctx.actor.id, {:created, ref}, :contains},
-         {:relate, ctx.actor.id, {:created, ref}, :owns},
-         {:notify_actor, "Created #{String.trim(name)} as a child of #{parent.name}."}
-       ]}
+         {:relate, ctx.actor.id, {:created, ref}, :owns}
+       ] ++
+         alias_event ++
+         [{:notify_actor, "Created #{name} as a child of #{parent.name}."}]}
     else
       nil -> {:error, :unknown_class}
       {:error, _} = error -> error
@@ -743,4 +755,161 @@ defmodule LineCore.Verbs.BuilderUnlink do
       do: :ok,
       else: {:error, :not_an_exit}
   end
+end
+
+
+defmodule LineCore.Verbs.BuilderAddAlias do
+  @behaviour LineCore.Verb
+
+  alias LineCore.{Builder, Object}
+
+  @impl true
+  def execute(ctx, [spec]) do
+    case Regex.run(~r/^(.+?)\s+to\s+(.+)$/i, spec) do
+      [_, alias_name, object_name] ->
+        with :ok <- Builder.require(ctx.actor),
+             {:ok, object} <- Builder.resolve_mutable(ctx, String.trim(object_name)) do
+          alias_name = String.trim(alias_name)
+          aliases = Object.get_local_property(object.id, "aliases") || []
+          aliases = Enum.uniq(aliases ++ [alias_name])
+
+          {:ok,
+           [
+             {:set_property, object.id, "aliases", aliases},
+             {:notify_actor, "Added alias #{alias_name} to #{object.name}."}
+           ]}
+        end
+
+      _ ->
+        {:error, :bad_args}
+    end
+  end
+
+  def execute(_ctx, _args), do: {:error, :bad_args}
+end
+
+defmodule LineCore.Verbs.BuilderRmAlias do
+  @behaviour LineCore.Verb
+
+  alias LineCore.{Builder, Object}
+
+  @impl true
+  def execute(ctx, [spec]) do
+    case Regex.run(~r/^(.+?)\s+from\s+(.+)$/i, spec) do
+      [_, alias_name, object_name] ->
+        with :ok <- Builder.require(ctx.actor),
+             {:ok, object} <- Builder.resolve_mutable(ctx, String.trim(object_name)) do
+          alias_name = String.trim(alias_name)
+          aliases = Object.get_local_property(object.id, "aliases") || []
+          kept = Enum.reject(aliases, &(String.downcase(&1) == String.downcase(alias_name)))
+
+          {:ok,
+           [
+             {:set_property, object.id, "aliases", kept},
+             {:notify_actor, "Removed alias #{alias_name} from #{object.name}."}
+           ]}
+        end
+
+      _ ->
+        {:error, :bad_args}
+    end
+  end
+
+  def execute(_ctx, _args), do: {:error, :bad_args}
+end
+
+defmodule LineCore.Verbs.BuilderAliases do
+  @behaviour LineCore.Verb
+
+  alias LineCore.{Builder, Object}
+
+  @impl true
+  def execute(ctx, [name]) do
+    with :ok <- Builder.require(ctx.actor),
+         object when not is_nil(object) <- Builder.resolve_any(ctx, name) do
+      aliases = Object.get_property(object.id, "aliases", [])
+
+      text =
+        case aliases do
+          [] -> "Aliases for #{object.name}: none."
+          _ -> "Aliases for #{object.name}: " <> Enum.join(aliases, ", ")
+        end
+
+      {:ok, [{:notify_actor, text}]}
+    else
+      nil -> {:error, :not_found}
+      {:error, _} = error -> error
+    end
+  end
+
+  def execute(_ctx, _args), do: {:error, :bad_args}
+end
+
+defmodule LineCore.Verbs.BuilderProperty do
+  @behaviour LineCore.Verb
+
+  alias LineCore.Builder
+
+  @impl true
+  def execute(ctx, [spec]) do
+    case Regex.run(~r/^(.+?):([A-Za-z0-9_:-]+)\s+(.+)$/i, spec) do
+      [_, object_name, key, raw_value] ->
+        with :ok <- Builder.require(ctx.actor),
+             {:ok, object} <- Builder.resolve_mutable(ctx, String.trim(object_name)) do
+          value = parse_value(raw_value)
+
+          {:ok,
+           [
+             {:set_property, object.id, key, value},
+             {:notify_actor, "Set property #{object.name}:#{key} = #{inspect(value)}."}
+           ]}
+        end
+
+      _ ->
+        {:error, :bad_args}
+    end
+  end
+
+  def execute(_ctx, _args), do: {:error, :bad_args}
+
+  defp parse_value(raw) do
+    value = String.trim(raw)
+
+    cond do
+      String.downcase(value) == "true" -> true
+      String.downcase(value) == "false" -> false
+      String.downcase(value) in ["nil", "null", "none"] -> nil
+      Regex.match?(~r/^-?\d+$/, value) -> String.to_integer(value)
+      Regex.match?(~r/^-?\d+\.\d+$/, value) -> String.to_float(value)
+      String.starts_with?(value, ~s(")) and String.ends_with?(value, ~s(")) ->
+        value |> String.trim_leading(~s(")) |> String.trim_trailing(~s("))
+      true -> value
+    end
+  end
+end
+
+defmodule LineCore.Verbs.BuilderRmProperty do
+  @behaviour LineCore.Verb
+
+  alias LineCore.Builder
+
+  @impl true
+  def execute(ctx, [spec]) do
+    case Regex.run(~r/^(.+?):([A-Za-z0-9_:-]+)$/i, String.trim(spec)) do
+      [_, object_name, key] ->
+        with :ok <- Builder.require(ctx.actor),
+             {:ok, object} <- Builder.resolve_mutable(ctx, String.trim(object_name)) do
+          {:ok,
+           [
+             {:delete_property, object.id, key},
+             {:notify_actor, "Removed property #{object.name}:#{key}."}
+           ]}
+        end
+
+      _ ->
+        {:error, :bad_args}
+    end
+  end
+
+  def execute(_ctx, _args), do: {:error, :bad_args}
 end
