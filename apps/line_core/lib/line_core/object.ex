@@ -339,19 +339,33 @@ defmodule LineCore.Object do
 
     exact =
       Enum.filter(objects, fn object ->
-        String.downcase(object.name) == normalized
+        object
+        |> names_for_matching()
+        |> Enum.any?(&(String.downcase(&1) == normalized))
       end)
 
     matches =
       if exact == [] do
         Enum.filter(objects, fn object ->
-          String.contains?(String.downcase(object.name), normalized)
+          object
+          |> names_for_matching()
+          |> Enum.any?(&String.contains?(String.downcase(&1), normalized))
         end)
       else
         exact
       end
 
     Enum.at(matches, ordinal - 1)
+  end
+
+  defp names_for_matching(object) do
+    aliases =
+      case get_property(object.id, "aliases", []) do
+        list when is_list(list) -> Enum.filter(list, &is_binary/1)
+        _ -> []
+      end
+
+    [object.name | aliases]
   end
 
   defp parse_match_selector(name) do
