@@ -311,6 +311,7 @@ defmodule LineCore.CompatCommandsTest do
     TestHarness.assert_msg(~r/satchel/i)
 
     assert :ok = CommandRouter.dispatch(mod.id, "@describe satchel as patched canvas bag")
+    TestHarness.assert_msg(~r/set satchel.*description/i)
     assert Object.get_property(satchel.id, "custom_description") == "patched canvas bag"
 
     assert :ok = CommandRouter.dispatch(mod.id, "@contents me")
