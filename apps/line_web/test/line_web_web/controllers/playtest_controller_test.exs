@@ -1,7 +1,7 @@
 defmodule LineWebWeb.PlaytestControllerTest do
   use LineWebWeb.ConnCase, async: false
 
-  alias LineCore.{Object, Repo, TestHarness}
+  alias LineCore.{Repo, TestHarness}
 
   @playtest_token "test-token-do-not-use-in-prod"
 
