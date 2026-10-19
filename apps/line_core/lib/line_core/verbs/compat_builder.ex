@@ -231,21 +231,33 @@ defmodule LineCore.Verbs.BuilderAudit do
   alias LineCore.{Builder, Object}
 
   @impl true
-  def execute(ctx, []) do
+  def execute(ctx, []), do: audit(ctx, ctx.actor)
+
+  def execute(ctx, [name]) do
+    with :ok <- Builder.require(ctx.actor),
+         target when not is_nil(target) <- Builder.resolve_any(ctx, name) do
+      audit(ctx, target)
+    else
+      nil -> {:error, :not_found}
+      {:error, _} = error -> error
+    end
+  end
+
+  def execute(_ctx, _args), do: {:error, :bad_args}
+
+  defp audit(ctx, target) do
     with :ok <- Builder.require(ctx.actor) do
-      owned = Object.owned(ctx.actor.id)
+      owned = Object.owned(target.id)
 
       text =
         case owned do
-          [] -> "You own no objects."
-          _ -> "Owned objects:\n" <> Enum.map_join(owned, "\n", &"  #{&1.name} [#{&1.id}]")
+          [] -> "#{target.name} owns no objects."
+          _ -> "Objects owned by #{target.name}:\n" <> Enum.map_join(owned, "\n", &"  #{&1.name} [#{&1.id}]")
         end
 
       {:ok, [{:notify_actor, text}]}
     end
   end
-
-  def execute(_ctx, _args), do: {:error, :bad_args}
 end
 
 defmodule LineCore.Verbs.BuilderClasses do
