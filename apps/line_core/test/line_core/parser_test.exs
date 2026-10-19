@@ -1,198 +1,207 @@
 defmodule LineCore.ParserTest do
   use ExUnit.Case, async: true
 
-  alias LineCore.{Parser, Verbs}
+  alias LineCore.{Parser, Verbs, WorldCommand}
 
-  describe "parse/1 — empty and trivial" do
-    test "empty string returns :empty" do
+  describe "empty input" do
+    test "returns :empty" do
       assert {:empty, _} = Parser.parse("")
       assert {:empty, _} = Parser.parse("   ")
     end
   end
 
-  describe "parse/1 — verb aliases" do
-    test "look aliases route to Look" do
-      assert {:ok, Verbs.Look, []} = Parser.parse("look")
-      assert {:ok, Verbs.Look, []} = Parser.parse("l")
+  describe "reserved social prefixes" do
+    test "quote prefix routes directly to say" do
+      assert {:ok, Verbs.Say, ["hello there"]} = Parser.parse(~s("hello there))
     end
 
-    test "examine aliases route to Examine with target" do
-      assert {:ok, Verbs.Examine, ["fence"]} = Parser.parse("examine fence")
-      assert {:ok, Verbs.Examine, ["fence"]} = Parser.parse("ex fence")
-      assert {:ok, Verbs.Examine, ["fence"]} = Parser.parse("x fence")
+    test "colon prefix routes directly to free emote" do
+      assert {:ok, Verbs.Emote, ["leans against the wall."]} =
+               Parser.parse(":leans against the wall.")
     end
 
-    test "inventory aliases route to Inventory" do
-      assert {:ok, Verbs.Inventory, []} = Parser.parse("inventory")
-      assert {:ok, Verbs.Inventory, []} = Parser.parse("inv")
-      assert {:ok, Verbs.Inventory, []} = Parser.parse("i")
+    test "dot prefix routes directly to sanctioned social namespace" do
+      assert {:ok, Verbs.Social, ["hi"]} = Parser.parse(".hi")
+      assert {:ok, Verbs.Social, ["wave", "Graves"]} = Parser.parse(".wave Graves")
     end
 
-    test "get synonyms all route to Get" do
-      for verb <- ~w(get grab gather pickup take) do
-        assert {:ok, Verbs.Get, ["knife"]} = Parser.parse("#{verb} knife")
-      end
+    test "dot social cannot fall through to an ordinary verb" do
+      assert {:ok, Verbs.Social, ["hi"]} = Parser.parse(".hi")
+    end
+  end
+
+  describe "system commands" do
+    test "commands aliases help" do
+      assert {:ok, Verbs.Help, []} = Parser.parse("commands")
     end
 
-    test "drop synonyms all route to Drop" do
-      for verb <- ~w(drop leave put discard) do
-        assert {:ok, Verbs.Drop, ["knife"]} = Parser.parse("#{verb} knife")
-      end
+    test "LambdaCore @commands use unique prefix abbreviations and canonical aliases" do
+      assert {:ok, Verbs.BuilderClasses, []} = Parser.parse("@cla")
+      assert {:ok, Verbs.BuilderParents, ["widget"]} = Parser.parse("@par widget")
+
+      assert {:ok, Verbs.BuilderProperty, ["widget:color red"]} =
+               Parser.parse("@prop widget:color red")
+
+      assert {:ok, Verbs.BuilderRmProperty, ["widget:color"]} =
+               Parser.parse("@rmprop widget:color")
+
+      assert {:world, %WorldCommand{verb: "@c"}} = Parser.parse("@c")
     end
 
-    test "text synonyms all route to Text" do
+    test "who stays in the system registry" do
+      assert {:ok, Verbs.Who, []} = Parser.parse("who")
+      assert {:ok, Verbs.Who, ["Graves"]} = Parser.parse("who Graves")
+    end
+
+    test "text aliases stay system-side" do
       for verb <- ~w(text txt tell) do
         assert {:ok, Verbs.Text, ["Graves", "hello"]} = Parser.parse("#{verb} Graves hello")
       end
     end
-  end
 
-  describe "parse/1 — directional shortcuts" do
-    test "bare cardinal directions route to Go" do
-      assert {:ok, Verbs.Go, ["n"]} = Parser.parse("n")
-      assert {:ok, Verbs.Go, ["north"]} = Parser.parse("north")
-      assert {:ok, Verbs.Go, ["s"]} = Parser.parse("s")
-      assert {:ok, Verbs.Go, ["sw"]} = Parser.parse("sw")
-    end
-
-    test "bare directions are case-insensitive" do
-      assert {:ok, Verbs.Go, ["n"]} = Parser.parse("N")
-      assert {:ok, Verbs.Go, ["north"]} = Parser.parse("NORTH")
-    end
-
-    test "explicit go also works" do
-      assert {:ok, Verbs.Go, ["north"]} = Parser.parse("go north")
-      assert {:ok, Verbs.Go, ["n"]} = Parser.parse("go n")
-    end
-
-    test "in/out are directions too" do
-      assert {:ok, Verbs.Go, ["in"]} = Parser.parse("in")
-      assert {:ok, Verbs.Go, ["out"]} = Parser.parse("out")
-    end
-  end
-
-  describe "parse/1 — speak prefix" do
-    test "quote prefix routes to Say" do
-      assert {:ok, Verbs.Say, ["hello there"]} = Parser.parse(~s("hello there))
-    end
-
-    test "quote prefix with no message" do
-      assert {:ok, Verbs.Say, [""]} = Parser.parse(~s("))
-    end
-
-    test "quote prefix preserves internal punctuation" do
-      assert {:ok, Verbs.Say, ["wait, who are you?"]} =
-               Parser.parse(~s("wait, who are you?))
-    end
-  end
-
-  describe "parse/1 — multi-word arguments" do
-    test "get with multi-word item name" do
-      assert {:ok, Verbs.Get, ["rusty knife"]} = Parser.parse("get rusty knife")
-    end
-
-    test "say with long message" do
-      assert {:ok, Verbs.Say, ["hello homosexy gals and gays"]} =
-               Parser.parse(~s("hello homosexy gals and gays))
-    end
-  end
-
-  describe "parse/1 — text verb structure" do
-    test "text <player> <message> splits at first space" do
-      assert {:ok, Verbs.Text, ["Graves", "are you ok"]} =
-               Parser.parse("text Graves are you ok")
-    end
-
-    test "text with only player name" do
-      assert {:ok, Verbs.Text, ["Graves"]} = Parser.parse("text Graves")
-    end
-  end
-
-  describe "parse/1 — @desc verb structure" do
-    test "@desc me as <description>" do
+    test "account/body maintenance syntax stays system-side during transition" do
       assert {:ok, Verbs.Desc, ["scarred and quiet"]} =
                Parser.parse("@desc me as scarred and quiet")
-    end
 
-    test "@desc self as <description>" do
-      assert {:ok, Verbs.Desc, ["weary"]} = Parser.parse("@desc self as weary")
-    end
-
-    test "@desc <object> as <description>" do
-      assert {:ok, Verbs.Desc, ["knife", "a dented blade"]} =
-               Parser.parse("@desc knife as a dented blade")
-    end
-
-    test "bare desc is unknown" do
-      assert {:unknown, "desc", _} = Parser.parse("desc me as test")
-    end
-  end
-
-  describe "parse/1 — @bare verb structure" do
-    test "@bare <part> as <description>" do
       assert {:ok, Verbs.Bare, ["feet", "%P has tiny feet."]} =
                Parser.parse("@bare feet as %P has tiny feet.")
-    end
 
-    test "@bare without as gives single arg" do
-      assert {:ok, Verbs.Bare, ["feet"]} = Parser.parse("@bare feet")
-    end
-
-    test "bare without @ prefix is unknown" do
-      assert {:unknown, "bare", _} = Parser.parse("bare feet as test")
-    end
-  end
-
-  describe "parse/1 — @gender verb structure" do
-    test "@gender me as <gender>" do
       assert {:ok, Verbs.Gender, ["she"]} = Parser.parse("@gender me as she")
-      assert {:ok, Verbs.Gender, ["he"]} = Parser.parse("@gender me as he")
-      assert {:ok, Verbs.Gender, ["they"]} = Parser.parse("@gender me as they")
-    end
 
-    test "@gender without me as gives empty args" do
-      assert {:ok, Verbs.Gender, []} = Parser.parse("@gender")
-    end
-
-    test "gender without @ prefix is unknown" do
-      assert {:unknown, "gender", _} = Parser.parse("gender me as she")
+      assert {:ok, Verbs.Password, ["longpassword"]} =
+               Parser.parse("@password me as longpassword")
     end
   end
 
-  describe "parse/1 — who verb" do
-    test "bare who" do
-      assert {:ok, Verbs.Who, []} = Parser.parse("who")
+  describe "world commands" do
+    test "look is parsed structurally rather than mapped to a module" do
+      assert {:world,
+              %WorldCommand{
+                verb: "look",
+                dobjstr: "self",
+                prepstr: nil,
+                iobjstr: nil
+              }} = Parser.parse("look self")
     end
 
-    test "who <player>" do
-      assert {:ok, Verbs.Who, ["Graves"]} = Parser.parse("who Graves")
-    end
-  end
+    test "game aliases remain strings for object verb matching" do
+      assert {:world, %WorldCommand{verb: "l", dobjstr: "crate"}} = Parser.parse("l crate")
 
-  describe "parse/1 — unknown verbs" do
-    test "unrecognized verb returns :unknown" do
-      assert {:unknown, "blarg", _} = Parser.parse("blarg")
-      assert {:unknown, "frob", _} = Parser.parse("frob the widget")
+      assert {:world, %WorldCommand{verb: "take", dobjstr: "knife"}} =
+               Parser.parse("take knife")
     end
 
-    test "unknown verb preserves original casing in raw, downcases in verb" do
-      assert {:unknown, "blarg", "BLARG foo"} = Parser.parse("BLARG foo")
+    test "bare directions become world go commands" do
+      assert {:world, %WorldCommand{verb: "go", argstr: "north", dobjstr: nil}} =
+               Parser.parse("north")
+
+      assert {:world, %WorldCommand{verb: "go", argstr: "n", dobjstr: nil}} =
+               Parser.parse("N")
+    end
+
+    test "explicit go keeps direction out of object resolution" do
+      assert {:ok, %WorldCommand{verb: "go", argstr: "north", dobjstr: nil}} =
+               Parser.parse_world("go north")
+    end
+
+    test "wield separates hand modifier from direct-object string" do
+      assert {:ok,
+              %WorldCommand{
+                verb: "wield",
+                dobjstr: "rusty knife",
+                modifier: "off"
+              }} = Parser.parse_world("wield rusty knife off")
+    end
+
+    test "sell parses direct object, preposition, and indirect object" do
+      assert {:ok,
+              %WorldCommand{
+                verb: "sell",
+                dobjstr: "twisted pipe",
+                prepstr: "to",
+                iobjstr: "Hamid"
+              }} = Parser.parse_world("sell twisted pipe to Hamid")
+    end
+
+    test "look at target treats target as the direct object" do
+      assert {:ok,
+              %WorldCommand{
+                verb: "look",
+                dobjstr: "fence",
+                prepstr: "at"
+              }} = Parser.parse_world("look at fence")
+    end
+
+    test "parses the full LambdaCore preposition vocabulary including leading prepositions" do
+      assert {:ok,
+              %WorldCommand{
+                verb: "look",
+                dobjstr: nil,
+                prepstr: "in front of",
+                iobjstr: "panel"
+              }} = Parser.parse_world("look in front of panel")
+
+      assert {:ok,
+              %WorldCommand{
+                verb: "put",
+                dobjstr: "coin",
+                prepstr: "on",
+                iobjstr: "table"
+              }} = Parser.parse_world("put coin on top of table")
+
+      assert {:ok,
+              %WorldCommand{
+                verb: "crawl",
+                dobjstr: nil,
+                prepstr: "under",
+                iobjstr: "door"
+              }} = Parser.parse_world("crawl underneath door")
+
+      assert {:ok,
+              %WorldCommand{
+                verb: "ask",
+                dobjstr: "Bob",
+                prepstr: "for",
+                iobjstr: "key"
+              }} = Parser.parse_world("ask Bob about key")
+
+      assert {:ok,
+              %WorldCommand{
+                verb: "look",
+                dobjstr: nil,
+                prepstr: "through",
+                iobjstr: "peephole"
+              }} = Parser.parse_world("look through peephole")
+    end
+
+    test "unrecognized ordinary words remain world commands for huh/verb search" do
+      assert {:world, %WorldCommand{verb: "frob", dobjstr: "widget"}} =
+               Parser.parse("frob widget")
     end
   end
 
   describe "verb_map / known_verbs" do
-    test "verb_map returns a map with all aliases" do
-      m = Parser.verb_map()
-      assert m["look"] == Verbs.Look
-      assert m["l"] == Verbs.Look
-      assert m["i"] == Verbs.Inventory
+    test "verb_map contains system commands but no ordinary game verbs" do
+      map = Parser.verb_map()
+
+      assert map["who"] == Verbs.Who
+      assert map["text"] == Verbs.Text
+      assert map["@password"] == Verbs.Password
+
+      refute Map.has_key?(map, "look")
+      refute Map.has_key?(map, "go")
+      refute Map.has_key?(map, "get")
+      refute Map.has_key?(map, "wield")
+      refute Map.has_key?(map, "attack")
     end
 
-    test "known_verbs returns deduplicated module list" do
+    test "known_verbs contains direct-prefix handlers and system handlers" do
       verbs = Parser.known_verbs()
-      assert Verbs.Look in verbs
-      assert Verbs.Go in verbs
-      # No duplicates
+
+      assert Verbs.Who in verbs
+      assert Verbs.Say in verbs
+      assert Verbs.Emote in verbs
+      assert Verbs.Social in verbs
       assert length(verbs) == length(Enum.uniq(verbs))
     end
   end

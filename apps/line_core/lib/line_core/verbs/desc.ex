@@ -13,6 +13,8 @@ defmodule LineCore.Verbs.Desc do
 
   @behaviour LineCore.Verb
 
+  alias LineCore.{Object, Resolver}
+
   @impl true
   def execute(_ctx, []), do: {:error, :desc_what}
 
@@ -30,8 +32,27 @@ defmodule LineCore.Verbs.Desc do
     end
   end
 
-  def execute(_ctx, [_object, _description]) do
-    {:error, :owned_object_desc_not_yet_implemented}
+  def execute(ctx, [object_name, description]) do
+    object = Resolver.visible(ctx, object_name)
+    trimmed = String.trim(description)
+
+    cond do
+      is_nil(object) ->
+        {:error, :not_found}
+
+      not Object.owns?(ctx.actor.id, object.id) ->
+        {:error, :permission_denied}
+
+      trimmed == "" ->
+        {:error, :empty_description}
+
+      true ->
+        {:ok,
+         [
+           {:set_property, object.id, "custom_description", trimmed},
+           {:notify_actor, "You set #{object.name}'s description."}
+         ]}
+    end
   end
 
   def execute(_ctx, _args), do: {:error, :bad_args}

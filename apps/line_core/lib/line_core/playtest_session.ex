@@ -54,6 +54,13 @@ defmodule LineCore.PlaytestSession do
     :exit, _ -> {:error, :no_session}
   end
 
+  @doc "Dispatch a raw command through the same parser/object-verb path as players."
+  def dispatch_raw(token, raw_command) when is_binary(raw_command) do
+    GenServer.call(via(token), {:dispatch_raw, raw_command})
+  catch
+    :exit, _ -> {:error, :no_session}
+  end
+
   @doc "Pull queued messages. Returns up to `limit` messages and removes them from the queue."
   def pull_messages(token, limit \\ 50) do
     GenServer.call(via(token), {:pull, limit})
@@ -123,6 +130,11 @@ defmodule LineCore.PlaytestSession do
 
   def handle_call({:dispatch, verb_module, args, raw}, _from, state) do
     result = LineCore.Dispatcher.dispatch(state.player_id, verb_module, args, raw)
+    {:reply, result, touch(state), @idle_timeout}
+  end
+
+  def handle_call({:dispatch_raw, raw}, _from, state) do
+    result = LineCore.CommandRouter.dispatch(state.player_id, raw)
     {:reply, result, touch(state), @idle_timeout}
   end
 

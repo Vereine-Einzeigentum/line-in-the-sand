@@ -24,6 +24,7 @@ defmodule LineMl.MixProject do
 
   defp deps do
     [
+      {:line_core, in_umbrella: true},
       {:line_shared, in_umbrella: true}
     ]
   end

@@ -1,0 +1,115 @@
+defmodule LineCore.ContainerVerbsTest do
+  use ExUnit.Case, async: false
+
+  alias LineCore.{Archetypes, CommandRouter, Container, Object, Repo, TestHarness}
+
+  setup do
+    Ecto.Adapters.SQL.Sandbox.checkout(Repo)
+    Ecto.Adapters.SQL.Sandbox.mode(Repo, :auto)
+
+    on_exit(fn ->
+      Repo.delete_all(LineCore.Schemas.Property)
+      Repo.delete_all(LineCore.Schemas.Relationship)
+      Repo.delete_all(LineCore.Schemas.Object)
+    end)
+
+    tree = Archetypes.seed()
+    room = TestHarness.spawn_room("Morgue")
+    player = TestHarness.spawn_player_in(room, "Alice")
+
+    {:ok, corpse} =
+      Object.create(:item, "corpse of Bob", %{parent_id: tree.corpse.id})
+
+    {:ok, _} = Object.relate(room.id, corpse.id, :contains)
+
+    {:ok, coin} = Object.create(:item, "bent coin")
+    {:ok, _} = Object.relate(player.id, coin.id, :contains)
+
+    {:ok, tree: tree, room: room, player: player, corpse: corpse, coin: coin}
+  end
+
+  test "put moves a carried object into a container through inherited container verb", ctx do
+    assert :ok = CommandRouter.dispatch(ctx.player.id, "put bent coin in corpse")
+
+    assert Object.container_of(ctx.coin.id).id == ctx.corpse.id
+    TestHarness.assert_msg(~r/put the bent coin in the corpse of Bob/i)
+  end
+
+  test "get from resolves an object nested inside the indirect container", ctx do
+    {:ok, {:ok, _}} = Object.move(ctx.coin.id, ctx.corpse.id)
+
+    assert :ok = CommandRouter.dispatch(ctx.player.id, "get bent coin from corpse")
+
+    assert Object.container_of(ctx.coin.id).id == ctx.player.id
+    TestHarness.assert_msg(~r/take the bent coin from the corpse of Bob/i)
+  end
+
+  test "ordinary items do not acquire container verbs", ctx do
+    {:ok, rock} = Object.create(:item, "rock")
+    {:ok, _} = Object.relate(ctx.room.id, rock.id, :contains)
+
+    assert {:error, :unknown_verb} =
+             CommandRouter.dispatch(ctx.player.id, "put bent coin in rock")
+
+    assert Object.container_of(ctx.coin.id).id == ctx.player.id
+  end
+
+  test "a robot corpse can be locally locked without a special corpse subsystem", ctx do
+    {:ok, robot_corpse} =
+      Object.create(:item, "corpse of service bot", %{parent_id: ctx.tree.corpse.id})
+
+    {:ok, _} = Object.relate(ctx.room.id, robot_corpse.id, :contains)
+    {:ok, _} = Object.set_property(robot_corpse.id, "locked", true)
+    {:ok, {:ok, _}} = Object.move(ctx.coin.id, robot_corpse.id)
+
+    assert {:error, :container_locked} =
+             CommandRouter.dispatch(ctx.player.id, "get bent coin from service bot")
+
+    assert Object.container_of(ctx.coin.id).id == robot_corpse.id
+  end
+
+  test "numbered references distinguish same-named containers", ctx do
+    {:ok, bag1} =
+      Object.create(:item, "bag", %{parent_id: ctx.tree.container.id})
+
+    {:ok, bag2} =
+      Object.create(:item, "bag", %{parent_id: ctx.tree.container.id})
+
+    {:ok, _} = Object.relate(ctx.player.id, bag1.id, :contains)
+    {:ok, _} = Object.relate(ctx.player.id, bag2.id, :contains)
+
+    assert :ok =
+             CommandRouter.dispatch(ctx.player.id, "put 1.bag in 2.bag")
+
+    assert Object.container_of(bag1.id).id == bag2.id
+    assert Object.container_of(bag2.id).id == ctx.player.id
+  end
+
+  test "numbered references create distinct containment and cycle guard sees the reverse", ctx do
+    {:ok, bag1} =
+      Object.create(:item, "bag", %{parent_id: ctx.tree.container.id})
+
+    {:ok, bag2} =
+      Object.create(:item, "bag", %{parent_id: ctx.tree.container.id})
+
+    {:ok, _} = Object.relate(ctx.player.id, bag1.id, :contains)
+    {:ok, _} = Object.relate(ctx.player.id, bag2.id, :contains)
+
+    assert :ok =
+             CommandRouter.dispatch(ctx.player.id, "put 1.bag in 2.bag")
+
+    assert Container.would_cycle?(bag2.id, bag1.id)
+  end
+
+  test "putting an object in itself is rejected", ctx do
+    {:ok, bag} =
+      Object.create(:item, "bag", %{parent_id: ctx.tree.container.id})
+
+    {:ok, _} = Object.relate(ctx.player.id, bag.id, :contains)
+
+    assert {:error, :containment_cycle} =
+             CommandRouter.dispatch(ctx.player.id, "put bag in bag")
+
+    assert Object.container_of(bag.id).id == ctx.player.id
+  end
+end

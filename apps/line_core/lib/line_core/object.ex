@@ -17,9 +17,31 @@ defmodule LineCore.Object do
 
   @doc "Create an object of the given type with the given name."
   def create(type, name, attrs \\ %{}) do
+    attrs = maybe_default_parent(type, name, attrs)
+
     %Object{}
     |> Object.changeset(Map.merge(%{type: type, name: name}, attrs))
     |> Repo.insert()
+  end
+
+  defp maybe_default_parent(type, name, attrs) when is_binary(name) do
+    has_parent =
+      Map.has_key?(attrs, :parent_id) or
+        Map.has_key?(attrs, "parent_id")
+
+    cond do
+      has_parent ->
+        attrs
+
+      String.starts_with?(name, "$") ->
+        attrs
+
+      true ->
+        case LineCore.Archetypes.default_parent_id(type) do
+          nil -> attrs
+          parent_id -> Map.put(attrs, :parent_id, parent_id)
+        end
+    end
   end
 
   ## Read
@@ -35,8 +57,8 @@ defmodule LineCore.Object do
 
   ## Properties
 
-  @doc "Get a property value by key. Returns nil if not set."
-  def get_property(object_id, key) do
+  @doc "Get a local property value only, without consulting inheritance."
+  def get_local_property(object_id, key) do
     from(p in Property, where: p.object_id == ^object_id and p.key == ^key, select: p.value)
     |> Repo.one()
     |> case do
@@ -46,7 +68,12 @@ defmodule LineCore.Object do
     end
   end
 
-  @doc "Get a property with a default if not set."
+  @doc "Get the effective property value, walking parent objects when absent locally."
+  def get_property(object_id, key) do
+    do_get_property(object_id, key, MapSet.new())
+  end
+
+  @doc "Get an effective property with a default if not found."
   def get_property(object_id, key, default) do
     case get_property(object_id, key) do
       nil -> default
@@ -54,7 +81,24 @@ defmodule LineCore.Object do
     end
   end
 
-  @doc "Set a property. Upserts."
+  defp do_get_property(object_id, key, seen) do
+    if MapSet.member?(seen, object_id) do
+      nil
+    else
+      case get_local_property(object_id, key) do
+        nil ->
+          case parent(object_id) do
+            nil -> nil
+            parent -> do_get_property(parent.id, key, MapSet.put(seen, object_id))
+          end
+
+        value ->
+          value
+      end
+    end
+  end
+
+  @doc "Set a property locally. Upserts; inherited values are never mutated."
   def set_property(object_id, key, value) do
     # Wrap scalar values in a map so JSONB can store them uniformly.
     stored_value = if is_map(value), do: value, else: %{"v" => value}
@@ -89,6 +133,50 @@ defmodule LineCore.Object do
     )
     |> Repo.all()
     |> Enum.map(fn {k, v} -> {k, unwrap(v)} end)
+  end
+
+  ## Inheritance
+
+  @doc "Return the object's direct inheritance parent, or nil."
+  def parent(object_id) do
+    case get(object_id) do
+      %{parent_id: nil} -> nil
+      %{parent_id: parent_id} -> get(parent_id)
+      nil -> nil
+    end
+  end
+
+  @doc "Return direct parent first, then each ancestor up to the root."
+  def ancestors(object_id) do
+    do_ancestors(object_id, MapSet.new())
+  end
+
+  defp do_ancestors(object_id, seen) do
+    if MapSet.member?(seen, object_id) do
+      []
+    else
+      case parent(object_id) do
+        nil ->
+          []
+
+        ancestor ->
+          [ancestor | do_ancestors(ancestor.id, MapSet.put(seen, object_id))]
+      end
+    end
+  end
+
+  @doc "True when object_id inherits from ancestor_id at any depth."
+  def descendant_of?(object_id, ancestor_id) do
+    Enum.any?(ancestors(object_id), &(&1.id == ancestor_id))
+  end
+
+  @doc "Direct inheritance children, oldest first."
+  def children(parent_id) do
+    from(o in Object,
+      where: o.parent_id == ^parent_id and is_nil(o.deleted_at),
+      order_by: [asc: o.inserted_at, asc: o.id]
+    )
+    |> Repo.all()
   end
 
   ## Relationships
@@ -132,7 +220,8 @@ defmodule LineCore.Object do
     from(o in Object,
       join: r in Relationship,
       on: r.to_id == o.id,
-      where: r.from_id == ^container_id and r.type == :contains and is_nil(o.deleted_at)
+      where: r.from_id == ^container_id and r.type == :contains and is_nil(o.deleted_at),
+      order_by: [asc: o.inserted_at, asc: o.id]
     )
     |> Repo.all()
   end
@@ -147,6 +236,37 @@ defmodule LineCore.Object do
     |> Repo.one()
   end
 
+  @doc "True when object_id is transitively contained by container_id."
+  def contained_by?(object_id, container_id) do
+    do_contained_by?(object_id, container_id, MapSet.new())
+  end
+
+  defp do_contained_by?(object_id, container_id, seen) do
+    cond do
+      object_id == container_id ->
+        true
+
+      MapSet.member?(seen, object_id) ->
+        false
+
+      true ->
+        case container_of(object_id) do
+          nil ->
+            false
+
+          %{id: ^container_id} ->
+            true
+
+          parent_container ->
+            do_contained_by?(
+              parent_container.id,
+              container_id,
+              MapSet.put(seen, object_id)
+            )
+        end
+    end
+  end
+
   ## Exit queries
 
   @doc "All exits from a room: list of {direction_string, destination_room_object}."
@@ -158,6 +278,24 @@ defmodule LineCore.Object do
       select: {fragment("?->>'direction'", r.metadata), o}
     )
     |> Repo.all()
+  end
+
+  @doc "Resolve the physical exit object for a direction when the room has one."
+  def resolve_exit_object(room_id, direction) do
+    canonical = canonicalize_direction(direction)
+
+    case LineCore.Archetypes.get(:exit) do
+      nil ->
+        nil
+
+      exit_root ->
+        room_id
+        |> contents()
+        |> Enum.find(fn object ->
+          (object.id == exit_root.id or descendant_of?(object.id, exit_root.id)) and
+            get_property(object.id, "direction") == canonical
+        end)
+    end
   end
 
   @doc "Resolve an exit direction (e.g. 'n', 'north') from a room. Returns destination room object or nil."
@@ -178,13 +316,78 @@ defmodule LineCore.Object do
 
   ## Name search
 
-  @doc "Find the first object in a list whose name matches (case-insensitive exact or substring)."
-  def find_by_name(objects, name) do
-    name_down = String.downcase(name)
+  @doc "Find an object anywhere in the live object graph by the same name rules as local resolution."
+  def find_global_by_name(name) when is_binary(name) do
+    from(o in Object,
+      where: is_nil(o.deleted_at),
+      order_by: [asc: o.inserted_at, asc: o.id]
+    )
+    |> Repo.all()
+    |> find_by_name(name)
+  end
 
-    Enum.find(objects, fn o ->
-      String.contains?(String.downcase(o.name), name_down)
-    end)
+  @doc """
+  Find an object by visible name.
+
+  Exact case-insensitive names win over substring matches. A leading one-based
+  selector such as `1.bag` or `2.bag` selects among the ordered matches,
+  preserving ordinary MOO duplicate-name disambiguation.
+  """
+  def find_by_name(objects, name) do
+    trimmed = String.trim(name)
+
+    if String.starts_with?(trimmed, "#") do
+      id = String.trim_leading(trimmed, "#")
+      Enum.find(objects, &(&1.id == id))
+    else
+      {ordinal, query} = parse_match_selector(trimmed)
+      normalized = String.downcase(query)
+
+      exact =
+        Enum.filter(objects, fn object ->
+          object
+          |> names_for_matching()
+          |> Enum.any?(&(String.downcase(&1) == normalized))
+        end)
+
+      matches =
+        if exact == [] do
+          Enum.filter(objects, fn object ->
+            object
+            |> names_for_matching()
+            |> Enum.any?(&String.contains?(String.downcase(&1), normalized))
+          end)
+        else
+          exact
+        end
+
+      Enum.at(matches, ordinal - 1)
+    end
+  end
+
+  defp names_for_matching(object) do
+    aliases =
+      case get_property(object.id, "aliases", []) do
+        list when is_list(list) -> Enum.filter(list, &is_binary/1)
+        _ -> []
+      end
+
+    [object.name | aliases]
+  end
+
+  defp parse_match_selector(name) do
+    trimmed = String.trim(name)
+
+    case Regex.run(~r/^(\d+)\.(.+)$/, trimmed) do
+      [_, ordinal, query] ->
+        case Integer.parse(ordinal) do
+          {n, ""} when n > 0 -> {n, String.trim(query)}
+          _ -> {1, trimmed}
+        end
+
+      _ ->
+        {1, trimmed}
+    end
   end
 
   ## Equipment / relationship queries
@@ -197,6 +400,14 @@ defmodule LineCore.Object do
       where: r.from_id == ^owner_id and r.type == ^rel_type and is_nil(o.deleted_at)
     )
     |> Repo.all()
+  end
+
+  @doc "Objects owned by owner_id through the ordinary :owns relation."
+  def owned(owner_id), do: related_by(owner_id, :owns)
+
+  @doc "True when owner_id owns object_id."
+  def owns?(owner_id, object_id) do
+    Enum.any?(owned(owner_id), &(&1.id == object_id))
   end
 
   @doc "All wielded and worn objects. Returns [{rel_type, object}]."

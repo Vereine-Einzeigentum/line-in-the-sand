@@ -35,6 +35,11 @@ defmodule LineCore.Schemas.Object do
     # but are filtered from queries.
     field(:deleted_at, :utc_datetime_usec)
 
+    # Inheritance ("is a kind of") is deliberately separate from containment.
+    # A child inherits properties and, later, verbs from its parent chain.
+    belongs_to(:parent, __MODULE__, foreign_key: :parent_id)
+    has_many(:children, __MODULE__, foreign_key: :parent_id)
+
     # EAV pattern for flexible properties. Hot properties (HP, location)
     # might get promoted to columns later if profiling demands it.
     has_many(:properties, Property, foreign_key: :object_id)
@@ -49,7 +54,7 @@ defmodule LineCore.Schemas.Object do
   end
 
   @required_fields [:type, :name]
-  @optional_fields [:description, :verbs, :deleted_at]
+  @optional_fields [:description, :verbs, :deleted_at, :parent_id]
 
   def changeset(object, attrs) do
     object

@@ -7,6 +7,7 @@ defmodule LineWebWeb.GameChannelTest do
   setup do
     Ecto.Adapters.SQL.Sandbox.checkout(Repo)
     Ecto.Adapters.SQL.Sandbox.mode(Repo, :auto)
+    LineCore.Archetypes.seed()
 
     on_exit(fn ->
       Repo.delete_all(LineCore.Schemas.Property)
@@ -67,7 +68,7 @@ defmodule LineWebWeb.GameChannelTest do
 
     ref = push(socket, "command", %{"raw" => "blarg"})
     assert_reply ref, :error, %{reason: reason}
-    assert reason =~ "unknown verb"
+    assert reason == "Huh?"
   end
 
   test "empty raw returns error" do
@@ -103,12 +104,27 @@ defmodule LineWebWeb.GameChannelTest do
     room = TestHarness.spawn_room("Stage")
     alice = TestHarness.spawn_player_in(room, "Alice")
     bob = TestHarness.spawn_player_in(room, "Bob")
-    socket_bob = connect_player(bob)
+    _socket_bob = connect_player(bob)
 
     # Alice says something via direct dispatcher call
     LineCore.Dispatcher.dispatch(alice.id, LineCore.Verbs.Say, ["hello"], "say hello")
 
     assert_push "room_msg", %{text: text}
     assert text =~ "Alice says"
+  end
+
+  test "transport session journals commands and disconnect without claiming a quit" do
+    room = TestHarness.spawn_room("Journal hub")
+    player = TestHarness.spawn_player_in(room, "Observer")
+    socket = connect_player(player)
+    ref = push(socket, "command", %{"raw" => "look"})
+    assert_reply ref, :ok, %{status: "dispatched"}
+    Process.unlink(socket.channel_pid)
+    close(socket)
+    entries = LineCore.Journal.export(player.id)
+    assert Enum.map(entries, & &1.event_type) == ["LOGIN", "COMMAND", "DISCONNECT"]
+    assert Enum.map(entries, & &1.session_position) == [1, 2, 3]
+    assert length(Enum.uniq_by(entries, & &1.session_id)) == 1
+    assert Enum.at(entries, 1).outcome == "applied"
   end
 end

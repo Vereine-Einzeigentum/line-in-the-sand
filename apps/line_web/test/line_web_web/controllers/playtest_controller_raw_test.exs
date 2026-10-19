@@ -8,6 +8,7 @@ defmodule LineWebWeb.PlaytestControllerRawTest do
   setup do
     Ecto.Adapters.SQL.Sandbox.checkout(Repo)
     Ecto.Adapters.SQL.Sandbox.mode(Repo, :auto)
+    LineCore.Archetypes.seed()
     System.put_env("PLAYTEST_TOKEN", @playtest_token)
 
     on_exit(fn ->

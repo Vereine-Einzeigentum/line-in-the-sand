@@ -20,15 +20,21 @@ defmodule LineWebWeb.GameChannel do
 
   use Phoenix.Channel
 
-  alias LineCore.{Dispatcher, Object, Parser, Presence, PubSub}
+  alias LineCore.{CommandRouter, Journal, Object, Presence, PubSub}
 
   ## Join
 
   @impl true
   def join("game:" <> requested_player_id, _payload, socket) do
     if requested_player_id == socket.assigns.player_id do
-      send(self(), :after_join)
-      {:ok, socket}
+      case Journal.open_session(requested_player_id, :game_channel) do
+        {:ok, session_id} ->
+          send(self(), :after_join)
+          {:ok, assign(socket, :play_session_id, session_id)}
+
+        {:error, reason} ->
+          {:error, %{reason: format_reason(reason)}}
+      end
     else
       {:error, %{reason: "player_id mismatch"}}
     end
@@ -87,26 +93,15 @@ defmodule LineWebWeb.GameChannel do
 
   @impl true
   def handle_in("command", %{"raw" => raw}, socket) when is_binary(raw) do
-    case Parser.parse(raw) do
-      {:ok, verb_module, args} ->
-        case Dispatcher.dispatch(socket.assigns.player_id, verb_module, args, raw) do
-          :ok ->
-            # If the verb was Go, we may have moved rooms — re-subscribe.
-            socket = maybe_resubscribe_room(socket, verb_module)
-            {:reply, {:ok, %{status: "dispatched"}}, socket}
+    case CommandRouter.dispatch(socket.assigns.player_id, raw,
+           session_id: socket.assigns.play_session_id
+         ) do
+      :ok ->
+        socket = maybe_resubscribe_room(socket)
+        {:reply, {:ok, %{status: "dispatched"}}, socket}
 
-          {:error, reason} ->
-            push(socket, "error", %{reason: format_reason(reason)})
-            {:reply, {:error, %{reason: format_reason(reason)}}, socket}
-        end
-
-      {:empty, _} ->
-        push(socket, "error", %{reason: "empty command"})
-        {:reply, {:error, %{reason: "empty command"}}, socket}
-
-      {:unknown, verb, _} ->
-        push(socket, "error", %{reason: "unknown verb: #{verb}"})
-        {:reply, {:error, %{reason: "unknown verb: #{verb}"}}, socket}
+      {:error, reason} ->
+        {:reply, {:error, %{reason: format_reason(reason)}}, socket}
     end
   end
 
@@ -122,6 +117,9 @@ defmodule LineWebWeb.GameChannel do
     player_id = socket.assigns[:player_id]
 
     if player_id do
+      if session_id = socket.assigns[:play_session_id],
+        do: Journal.close_session(player_id, session_id)
+
       Presence.unregister(player_id)
       PubSub.unsubscribe({:actor, player_id})
 
@@ -136,7 +134,7 @@ defmodule LineWebWeb.GameChannel do
 
   ## Helpers
 
-  defp maybe_resubscribe_room(socket, LineCore.Verbs.Go) do
+  defp maybe_resubscribe_room(socket) do
     player_id = socket.assigns.player_id
     new_room = Object.container_of(player_id)
 
@@ -151,8 +149,9 @@ defmodule LineWebWeb.GameChannel do
     end
   end
 
-  defp maybe_resubscribe_room(socket, _verb), do: socket
-
+  defp format_reason(:unknown_verb), do: "Huh?"
+  defp format_reason(:no_such_exit), do: "You can't go that way."
+  defp format_reason(:empty_command), do: "empty command"
   defp format_reason(reason) when is_atom(reason), do: to_string(reason)
   defp format_reason({tag, _detail}) when is_atom(tag), do: to_string(tag)
   defp format_reason(other), do: inspect(other)

@@ -1,13 +1,14 @@
 defmodule LineWebWeb.PlaytestControllerTest do
   use LineWebWeb.ConnCase, async: false
 
-  alias LineCore.{Object, Repo, TestHarness}
+  alias LineCore.{Repo, TestHarness}
 
   @playtest_token "test-token-do-not-use-in-prod"
 
   setup do
     Ecto.Adapters.SQL.Sandbox.checkout(Repo)
     Ecto.Adapters.SQL.Sandbox.mode(Repo, :auto)
+    LineCore.Archetypes.seed()
 
     # Set env var for the duration of the test
     System.put_env("PLAYTEST_TOKEN", @playtest_token)

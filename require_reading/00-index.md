@@ -13,6 +13,11 @@ Read these files **in order** before touching the codebase. They are the spec.
 | 07 | [skills.md](07-skills.md) | 19 skills as objects. Formulas. Attribute frequencies. |
 | 08 | [health-bars.md](08-health-bars.md) | HP, Fatigue, Stress. Scaling. Zero/max behavior. |
 | 09 | [core-stats.md](09-core-stats.md) | Faction Rep, Social Clout, Money, Signal. |
+| 10 | [adaptive-intelligence.md](10-adaptive-intelligence.md) | Play-BERT, predictive World Model, Director, Actor/Jev, authority boundaries, and learning cadence. |
+
+For intelligence architecture, `10` governs and supersedes earlier descriptions
+of an Actor directly generating executable actions. Actor produces intent; Jev
+proposes a plan; the ordinary dispatcher remains authoritative.
 
 Cross-reference: [MECHANICS_CANON.md](../MECHANICS_CANON.md) is the consolidated
 numbers source. These specs describe **how to build it**; the canon describes

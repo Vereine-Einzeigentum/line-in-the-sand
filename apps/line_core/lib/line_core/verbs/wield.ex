@@ -6,9 +6,10 @@ defmodule LineCore.Verbs.Wield do
   `hold <item>`, `equip <item>` — aliases.
 
   The item must already be in the actor's inventory (`:contains`). Wielding
-  removes the `:contains` relationship and adds `:wields_main` or `:wields_off`.
+  keeps containment intact and adds `:wields_main` or `:wields_off`.
 
-  If something is already wielded in that hand, it's moved back to `:contains`.
+  If something is already wielded in that hand, only its wield relationship
+  is removed. Carrying and wielding are independent relations.
   """
 
   @behaviour LineCore.Verb
@@ -46,13 +47,11 @@ defmodule LineCore.Verbs.Wield do
             ex ->
               [
                 {:unrelate, ctx.actor.id, ex.id, hand_relation},
-                {:relate, ctx.actor.id, ex.id, :contains},
                 {:notify_actor, "You stow the #{ex.name}."}
               ]
           end
 
         equip_events = [
-          {:unrelate, ctx.actor.id, item.id, :contains},
           {:relate, ctx.actor.id, item.id, hand_relation},
           {:notify_actor, "You wield the #{item.name} in your #{hand_label} hand."},
           {:notify_room, "#{ctx.actor.name} wields a #{item.name}.", except: [ctx.actor.id]}

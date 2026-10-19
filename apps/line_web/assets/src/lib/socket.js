@@ -57,7 +57,7 @@ export function createConnection({ token, playerId, onMessage, onStatus }) {
         channel
           .push('cmd', { raw })
           .receive('ok', resolve)
-          .receive('error', reject)
+          .receive('error', (reason) => reject(new Error(reason?.reason || JSON.stringify(reason))))
           .receive('timeout', () => reject(new Error('timeout')));
       });
     },
