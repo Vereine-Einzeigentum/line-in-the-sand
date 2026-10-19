@@ -29,6 +29,8 @@ defmodule LineCore.Parser do
     "@create" => Verbs.BuilderCreate,
     "@dig" => Verbs.BuilderDig,
     "@open" => Verbs.BuilderOpen,
+    "@link" => Verbs.BuilderLink,
+    "@unlink" => Verbs.BuilderUnlink,
     "@examine" => Verbs.BuilderInspect,
     "@show" => Verbs.BuilderInspect,
     "@contents" => Verbs.BuilderContents,
@@ -297,7 +299,7 @@ defmodule LineCore.Parser do
     end
   end
 
-  defp parse_system_args(Verbs.BuilderMove, rest) do
+  defp parse_system_args(module, rest) when module in [Verbs.BuilderMove, Verbs.BuilderLink] do
     case Regex.run(~r/^(.+?)\s+to\s+(.+)$/i, rest) do
       [_, object, destination] -> [String.trim(object), String.trim(destination)]
       _ -> [rest]
