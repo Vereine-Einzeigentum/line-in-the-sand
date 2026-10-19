@@ -245,8 +245,8 @@ defmodule LineCore.Verbs.BuilderClasses do
   def execute(ctx, []) do
     with :ok <- Builder.require(ctx.actor) do
       classes =
-        Archetypes.get(:root).id
-        |> Object.children()
+        Archetypes.get(:root)
+        |> descendants()
         |> Enum.filter(&(Object.get_property(&1.id, "archetype", false) == true))
         |> Enum.map(& &1.name)
         |> Enum.sort()
@@ -256,6 +256,11 @@ defmodule LineCore.Verbs.BuilderClasses do
   end
 
   def execute(_ctx, _args), do: {:error, :bad_args}
+
+  defp descendants(object) do
+    children = Object.children(object.id)
+    children ++ Enum.flat_map(children, &descendants/1)
+  end
 end
 
 defmodule LineCore.Verbs.BuilderQuota do
