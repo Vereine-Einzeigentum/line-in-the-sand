@@ -307,11 +307,20 @@ defmodule LineCore.CompatCommandsTest do
     assert exam =~ satchel.id
     assert exam =~ "$container"
 
+    assert :ok = CommandRouter.dispatch(mod.id, "@show satchel")
+    TestHarness.assert_msg(~r/satchel/i)
+
+    assert :ok = CommandRouter.dispatch(mod.id, "@describe satchel as patched canvas bag")
+    assert Object.get_property(satchel.id, "custom_description") == "patched canvas bag"
+
     assert :ok = CommandRouter.dispatch(mod.id, "@contents me")
     TestHarness.assert_msg(~r/satchel/i)
 
     assert :ok = CommandRouter.dispatch(mod.id, "@parents satchel")
     TestHarness.assert_msg(~r/\$container.*\$item.*\$root/is)
+
+    assert :ok = CommandRouter.dispatch(mod.id, "@kids $item")
+    TestHarness.assert_msg(~r/\$container.*\$wieldable.*\$clothing/is)
 
     assert :ok = CommandRouter.dispatch(mod.id, "@properties satchel")
     TestHarness.assert_msg(~r/open.*true/is)
