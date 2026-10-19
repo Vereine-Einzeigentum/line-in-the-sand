@@ -49,7 +49,9 @@ defmodule LineCore.CompatCommandsTest do
     Object.relate(ctx.player.id, coat.id, :wears)
 
     assert :ok = CommandRouter.dispatch(ctx.player.id, "gear")
-    TestHarness.assert_msg(~r/knife.*coat/is)
+    gear = TestHarness.assert_msg(~r/(Main hand|Wearing)/)
+    assert gear =~ "knife"
+    assert gear =~ "coat"
   end
 
   test "ordinary emote command matches the colon shorthand", ctx do
