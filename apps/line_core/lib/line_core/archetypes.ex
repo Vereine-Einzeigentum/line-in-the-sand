@@ -280,6 +280,11 @@ defmodule LineCore.Archetypes do
 
       {tree.room, %{name: "go", aliases: ["move"], module: "go", dobj: "none", prep: "none", iobj: "none", arg_mode: "rest"}},
 
+      {tree.exit, %{name: "open", aliases: [], module: "open", dobj: "this", prep: "none", iobj: "none", arg_mode: "target_required"}},
+      {tree.exit, %{name: "close", aliases: [], module: "close", dobj: "this", prep: "none", iobj: "none", arg_mode: "target_required"}},
+      {tree.exit, %{name: "lock", aliases: [], module: "lock", dobj: "this", prep: "with", iobj: "any", arg_mode: "object_pair"}},
+      {tree.exit, %{name: "unlock", aliases: [], module: "unlock", dobj: "this", prep: "with", iobj: "any", arg_mode: "object_pair"}},
+
       {tree.motile, %{name: "inventory", aliases: ["inv", "i"], module: "inventory", dobj: "none", prep: "none", iobj: "none", arg_mode: "none"}},
       {tree.motile, %{name: "score", aliases: ["sc", "stats"], module: "score", dobj: "none", prep: "none", iobj: "none", arg_mode: "none"}},
       {tree.motile, %{name: "skills", aliases: ["sk"], module: "skills", dobj: "none", prep: "none", iobj: "none", arg_mode: "none"}},
