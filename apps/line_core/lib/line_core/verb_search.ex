@@ -85,7 +85,13 @@ defmodule LineCore.VerbSearch do
     typed = String.downcase(typed || "")
     canonical = String.downcase(definition.name || "")
     aliases = Enum.map(definition.aliases || [], &String.downcase/1)
-    typed == canonical or typed in aliases
+
+    [canonical | aliases]
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.any?(fn candidate ->
+      typed == candidate or
+        (String.length(typed) >= 2 and String.starts_with?(candidate, typed))
+    end)
   end
 
   defp object_spec_matches?("none", object, _origin), do: is_nil(object)
