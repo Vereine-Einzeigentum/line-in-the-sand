@@ -461,6 +461,36 @@ defmodule LineCore.CompatCommandsTest do
     assert Object.get_local_property(widget.id, "color") == nil
   end
 
+  test "moderator @eject expels objects from a place and sends homed actors home", ctx do
+    {:ok, mod} = Object.create(:player, "Mod", %{parent_id: ctx.tree.mod.id})
+    {:ok, _} = Object.relate(ctx.room.id, mod.id, :contains)
+    LineCore.PubSub.subscribe({:actor, mod.id})
+
+    junk = TestHarness.spawn_item_in(ctx.room, "junk")
+    bob = TestHarness.spawn_player_in(ctx.room, "Bob")
+    home = TestHarness.spawn_room("Bob Home")
+    {:ok, _} = Object.set_property(bob.id, "home_room_id", home.id)
+
+    assert :ok = CommandRouter.dispatch(mod.id, "@eject junk")
+    assert Object.container_of(junk.id) == nil
+    TestHarness.assert_msg(~r/eject.*junk/i)
+
+    assert :ok = CommandRouter.dispatch(mod.id, "@eject Bob from Hub")
+    assert Object.container_of(bob.id).id == home.id
+    TestHarness.assert_msg(~r/eject.*Bob.*Hub/i)
+  end
+
+  test "@eject can expel an object from moderator inventory with from me", ctx do
+    {:ok, mod} = Object.create(:player, "Mod", %{parent_id: ctx.tree.mod.id})
+    {:ok, _} = Object.relate(ctx.room.id, mod.id, :contains)
+    LineCore.PubSub.subscribe({:actor, mod.id})
+
+    junk = TestHarness.spawn_item_in(mod, "junk")
+
+    assert :ok = CommandRouter.dispatch(mod.id, "@eject junk from me")
+    assert Object.container_of(junk.id) == nil
+  end
+
   test "ordinary players cannot use moderator builder commands", ctx do
     assert {:error, :permission_denied} =
              CommandRouter.dispatch(ctx.player.id, "@create $container named satchel")
