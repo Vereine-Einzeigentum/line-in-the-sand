@@ -352,6 +352,43 @@ defmodule LineCore.CompatCommandsTest do
     assert Object.get_local_property(crate.id, "open") == nil
   end
 
+
+  test "bulk container manipulation supports all", ctx do
+    {:ok, box} = Object.create(:item, "box", %{parent_id: ctx.tree.container.id})
+    a = TestHarness.spawn_item_in(ctx.player, "washer")
+    b = TestHarness.spawn_item_in(ctx.player, "bolt")
+    {:ok, _} = Object.relate(ctx.room.id, box.id, :contains)
+
+    assert :ok = CommandRouter.dispatch(ctx.player.id, "put all in box")
+    assert Object.container_of(a.id).id == box.id
+    assert Object.container_of(b.id).id == box.id
+
+    assert :ok = CommandRouter.dispatch(ctx.player.id, "get all from box")
+    assert Object.container_of(a.id).id == ctx.player.id
+    assert Object.container_of(b.id).id == ctx.player.id
+  end
+
+  test "moderator @link/@unlink retarget an owned exit and @move can move self", ctx do
+    a = TestHarness.spawn_room("Destination A")
+    b = TestHarness.spawn_room("Destination B")
+    {:ok, mod} = Object.create(:player, "Mod", %{parent_id: ctx.tree.mod.id})
+    {:ok, _} = Object.relate(ctx.room.id, mod.id, :contains)
+    LineCore.PubSub.subscribe({:actor, mod.id})
+
+    assert :ok = CommandRouter.dispatch(mod.id, "@open east to Destination A")
+    TestHarness.assert_msg(~r/(Opened|Dug) exit east/i)
+    assert Object.resolve_exit(ctx.room.id, "east").id == a.id
+
+    assert :ok = CommandRouter.dispatch(mod.id, "@link east exit to Destination B")
+    assert Object.resolve_exit(ctx.room.id, "east").id == b.id
+
+    assert :ok = CommandRouter.dispatch(mod.id, "@unlink east exit")
+    assert Object.resolve_exit(ctx.room.id, "east") == nil
+
+    assert :ok = CommandRouter.dispatch(mod.id, "@move me to Destination B")
+    assert Object.container_of(mod.id).id == b.id
+  end
+
   test "ordinary players cannot use moderator builder commands", ctx do
     assert {:error, :permission_denied} =
              CommandRouter.dispatch(ctx.player.id, "@create $container named satchel")
