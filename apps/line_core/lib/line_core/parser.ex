@@ -304,7 +304,7 @@ defmodule LineCore.Parser do
     end
   end
 
-  defp parse_system_args(Verbs.BuilderDig, rest) do
+  defp parse_system_args(module, rest) when module in [Verbs.BuilderDig, Verbs.BuilderOpen] do
     case Regex.run(~r/^(.+?)\s+to\s+(.+)$/i, rest) do
       [_, exit_spec, destination] ->
         [String.trim(exit_spec), strip_quotes(destination)]
