@@ -353,8 +353,10 @@ The existing [semantic enactment slice](../docs/semantic-enactment.md) provides
 typed item completion, inert consequences, enact/defer/reject policy, validated
 event graphs, and transactional materialization. `LineMl` currently has an
 item-completion backend contract, not a trained encoder or an Actor/Jev runtime.
-The neural systems, learning journal, and training lifecycle above remain work
-to implement.
+The [first play-journal slice](../docs/play-journal.md) records committed
+mechanics, distinct proposal diagnostics, and WebSocket session observations.
+Temporal outcome extraction, the neural systems, and training lifecycle remain
+work to implement.
 
 The [delivery plan](../docs/plans/2026-10-19-adaptive-intelligence-foundation.md)
 starts with a durable structured play journal and explicit outcome/censoring

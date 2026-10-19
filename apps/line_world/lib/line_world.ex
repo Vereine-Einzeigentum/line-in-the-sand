@@ -43,11 +43,18 @@ defmodule LineWorld do
   end
 
   def enact(actor_id, consequence) do
+    provenance =
+      case Consequence.validate(consequence) do
+        :ok -> consequence.provenance
+        _ -> nil
+      end
+
     Dispatcher.dispatch_transactional(
       actor_id,
       LineWorld.Enactment,
       [consequence],
-      "semantic enactment"
+      "semantic enactment",
+      provenance: provenance
     )
   end
 

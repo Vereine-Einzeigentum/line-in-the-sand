@@ -1,7 +1,7 @@
 defmodule LineWebWeb.PlayerChannel do
   use Phoenix.Channel
 
-  alias LineCore.{CommandRouter, Object, PubSub}
+  alias LineCore.{CommandRouter, Journal, Object, PubSub}
 
   @impl true
   def join("player:" <> player_id, _payload, socket) do
@@ -11,26 +11,32 @@ defmodule LineWebWeb.PlayerChannel do
           {:error, %{reason: "player_not_found"}}
 
         _player ->
-          :ok = PubSub.subscribe({:actor, player_id})
+          with {:ok, session_id} <- Journal.open_session(player_id, :player_channel) do
+            socket = assign(socket, :play_session_id, session_id)
+            :ok = PubSub.subscribe({:actor, player_id})
 
-          if Object.get_property(player_id, "temp_password") == true do
-            send(
-              self(),
-              {:system,
-               %{
-                 text: "You are using a temporary password. Type: @password me as <newpassword>",
-                 kind: "warning"
-               }}
-            )
-          end
+            if Object.get_property(player_id, "temp_password") == true do
+              send(
+                self(),
+                {:system,
+                 %{
+                   text:
+                     "You are using a temporary password. Type: @password me as <newpassword>",
+                   kind: "warning"
+                 }}
+              )
+            end
 
-          case Object.container_of(player_id) do
-            %{id: room_id} ->
-              :ok = PubSub.subscribe({:room, room_id})
-              {:ok, assign(socket, :room_id, room_id)}
+            case Object.container_of(player_id) do
+              %{id: room_id} ->
+                :ok = PubSub.subscribe({:room, room_id})
+                {:ok, assign(socket, :room_id, room_id)}
 
-            nil ->
-              {:ok, assign(socket, :room_id, nil)}
+              nil ->
+                {:ok, assign(socket, :room_id, nil)}
+            end
+          else
+            {:error, reason} -> {:error, %{reason: error_text(reason)}}
           end
       end
     else
@@ -40,7 +46,9 @@ defmodule LineWebWeb.PlayerChannel do
 
   @impl true
   def handle_in("cmd", %{"raw" => raw}, socket) when is_binary(raw) do
-    case CommandRouter.dispatch(socket.assigns.player_id, raw) do
+    case CommandRouter.dispatch(socket.assigns.player_id, raw,
+           session_id: socket.assigns.play_session_id
+         ) do
       :ok ->
         socket = maybe_resubscribe_room(socket)
         {:reply, :ok, socket}
@@ -71,6 +79,14 @@ defmodule LineWebWeb.PlayerChannel do
   end
 
   def handle_info(_other, socket), do: {:noreply, socket}
+
+  @impl true
+  def terminate(_reason, socket) do
+    if session_id = socket.assigns[:play_session_id],
+      do: Journal.close_session(socket.assigns.player_id, session_id)
+
+    :ok
+  end
 
   defp maybe_resubscribe_room(socket) do
     new_room_id =

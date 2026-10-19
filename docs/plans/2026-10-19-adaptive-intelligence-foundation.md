@@ -13,12 +13,14 @@ items, inert consequences, enact/defer/reject policy, validated event graphs,
 and transactional item materialization. Model execution currently means a
 bounded item-completion backend contract with explicit unavailability.
 
-There is no Play-BERT, Actor/Jev runtime, predictive World Model, Director,
-learning journal, or training lifecycle yet. Bounded weapon mechanics and real
+The [first journal slice](../play-journal.md) now records dispatcher outcomes,
+mechanical effects, and WebSocket sessions with ordered export. There is no
+Play-BERT, Actor/Jev runtime, predictive World Model, Director, or training
+lifecycle yet. Bounded weapon mechanics and real
 solver/inference adapters remain semantic-spine work; the intelligence stack
 first needs actual play history.
 
-## 1. Durable structured play journal — next implementation slice
+## 1. Durable structured play journal — first slice implemented
 
 Define a versioned event envelope containing stable event identity, timestamp,
 ordering, actor/target/location/faction references, outcome, session identity
@@ -47,7 +49,7 @@ proposals cannot be mistaken for applied events; export preserves ordering and
 timing; gameplay works with inference unavailable. Verify delivery/retry
 behavior so telemetry retries do not silently duplicate training samples.
 
-## 2. Temporal outcomes and corpus extraction
+## 2. Temporal outcomes and corpus extraction — next slice
 
 Build episode/session extraction over the journal, with explicit observation
 cutoffs and content identity. Preserve time gaps and distinguish trigger→quit,

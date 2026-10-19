@@ -25,5 +25,6 @@ planner, not this application's deterministic Event Model. Every proposed
 action still passes through ordinary dispatcher validation.
 
 The [foundation plan](../../docs/plans/2026-10-19-adaptive-intelligence-foundation.md)
-puts structured play history first. The current slice does not include the
-neural stack, a durable decision journal, or a deferral scheduler.
+puts structured play history first. The [play journal](../../docs/play-journal.md)
+now records proposal outcomes and applied mechanics. The neural stack and a
+deferral scheduler remain unimplemented.

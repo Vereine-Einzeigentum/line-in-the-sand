@@ -36,7 +36,8 @@ defines Play-BERT, the predictive World Model, the Director, and the Actor/Jev
 pair. Actor produces intent; Jev proposes actions using available affordances;
 the ordinary dispatcher validates and applies canonical events.
 
-See the [implemented semantic enactment path](docs/semantic-enactment.md) and
+See the [implemented semantic enactment path](docs/semantic-enactment.md),
+[structured play journal](docs/play-journal.md), and
 the [next implementation slices](docs/plans/2026-10-19-adaptive-intelligence-foundation.md).
 The trained neural stack is a target, not an existing feature.
 

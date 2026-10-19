@@ -8,10 +8,10 @@ defmodule LineCore.CommandRouter do
 
   alias LineCore.{Dispatcher, Parser, VerbSearch}
 
-  def dispatch(actor_id, raw) when is_binary(raw) do
+  def dispatch(actor_id, raw, opts \\ []) when is_binary(raw) do
     case Parser.parse(raw) do
       {:ok, verb_module, args} ->
-        Dispatcher.dispatch(actor_id, verb_module, args, raw)
+        Dispatcher.dispatch(actor_id, verb_module, args, raw, opts)
 
       {:world, command} ->
         case VerbSearch.resolve(actor_id, command) do
@@ -22,7 +22,8 @@ defmodule LineCore.CommandRouter do
               match.args,
               raw,
               match.context.dobj,
-              match.context.iobj
+              match.context.iobj,
+              opts
             )
 
           {:error, :no_matching_verb} ->

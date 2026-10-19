@@ -143,4 +143,29 @@ defmodule LineWorldTest do
     assert Object.contents(ctx.actor.id) == []
     refute_receive {:msg, _}
   end
+
+  test "proposal diagnostics and committed effects retain provenance with inference offline",
+       ctx do
+    request = %LineMl.Request{id: "offline", spec: ctx.spec, instruction: "complete"}
+    assert {:error, :unavailable} = LineMl.complete(request)
+    partial = %{ctx.spec | unknown: MapSet.new(["mass"])}
+    {:ok, [proposal]} = Logic.derive(partial, ctx.provenance)
+    assert {:error, {:deferred, _}} = LineWorld.enact(ctx.actor.id, proposal)
+    Object.set_property(ctx.actor.id, "can_materialize_items", false)
+    assert {:error, {:rejected, _}} = LineWorld.enact(ctx.actor.id, ctx.consequence)
+    Object.set_property(ctx.actor.id, "can_materialize_items", true)
+    assert :ok = LineWorld.enact(ctx.actor.id, ctx.consequence)
+
+    entries = LineCore.Journal.export(ctx.actor.id)
+    assert Enum.map(entries, & &1.outcome) == ["deferred", "rejected", "applied"]
+    assert Enum.all?(entries, &(&1.event_type == "PROPOSAL"))
+    assert Enum.all?(entries, &(&1.data["provenance"] == ctx.provenance))
+    refute Map.has_key?(hd(entries).data, "effects")
+    [item] = Object.contents(ctx.actor.id)
+
+    assert [%{"type" => "CREATE_OBJECT", "object_id" => id} | _] =
+             List.last(entries).data["effects"]
+
+    assert id == item.id
+  end
 end

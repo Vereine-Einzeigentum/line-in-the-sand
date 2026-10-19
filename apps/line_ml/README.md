@@ -25,5 +25,6 @@ validation controls what becomes real. The deterministic Event Model in
 
 Those models and their training lifecycle are not implemented yet. The
 [foundation plan](../../docs/plans/2026-10-19-adaptive-intelligence-foundation.md)
-starts with structured play history and temporal outcomes. Model outages must
-leave deterministic world execution available.
+builds on the [play journal](../../docs/play-journal.md); temporal outcome
+extraction comes next. Model outages leave deterministic world execution
+available.

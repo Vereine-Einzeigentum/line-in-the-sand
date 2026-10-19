@@ -20,15 +20,21 @@ defmodule LineWebWeb.GameChannel do
 
   use Phoenix.Channel
 
-  alias LineCore.{CommandRouter, Object, Presence, PubSub}
+  alias LineCore.{CommandRouter, Journal, Object, Presence, PubSub}
 
   ## Join
 
   @impl true
   def join("game:" <> requested_player_id, _payload, socket) do
     if requested_player_id == socket.assigns.player_id do
-      send(self(), :after_join)
-      {:ok, socket}
+      case Journal.open_session(requested_player_id, :game_channel) do
+        {:ok, session_id} ->
+          send(self(), :after_join)
+          {:ok, assign(socket, :play_session_id, session_id)}
+
+        {:error, reason} ->
+          {:error, %{reason: format_reason(reason)}}
+      end
     else
       {:error, %{reason: "player_id mismatch"}}
     end
@@ -87,7 +93,9 @@ defmodule LineWebWeb.GameChannel do
 
   @impl true
   def handle_in("command", %{"raw" => raw}, socket) when is_binary(raw) do
-    case CommandRouter.dispatch(socket.assigns.player_id, raw) do
+    case CommandRouter.dispatch(socket.assigns.player_id, raw,
+           session_id: socket.assigns.play_session_id
+         ) do
       :ok ->
         socket = maybe_resubscribe_room(socket)
         {:reply, {:ok, %{status: "dispatched"}}, socket}
@@ -109,6 +117,9 @@ defmodule LineWebWeb.GameChannel do
     player_id = socket.assigns[:player_id]
 
     if player_id do
+      if session_id = socket.assigns[:play_session_id],
+        do: Journal.close_session(player_id, session_id)
+
       Presence.unregister(player_id)
       PubSub.unsubscribe({:actor, player_id})
 

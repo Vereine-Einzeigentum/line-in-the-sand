@@ -25,97 +25,113 @@ defmodule LineCore.Dispatcher do
   - `{:broadcast_channel, channel, msg}`
   """
 
-  alias LineCore.Repo
+  alias LineCore.{Repo, Journal}
+  alias LineCore.Journal.Effects
   alias LineCore.Schemas.{Object, Property, Relationship}
   alias LineCore.Verb.Context
   alias Ecto.Multi
 
-  def dispatch(actor_id, verb_module, args, raw_command) do
-    dispatch_resolved(actor_id, verb_module, args, raw_command, nil, nil)
+  def dispatch(actor_id, verb_module, args, raw_command, opts \\ []) do
+    dispatch_resolved(actor_id, verb_module, args, raw_command, nil, nil, opts)
   end
 
   @doc """
   Evaluate trusted enactment policy and apply its events inside one transaction.
-  Lock the acting object before reading policy. Notifications leave only after
-  commit. This entry point is internal; web clients still use CommandRouter.
+  All dispatch paths lock the actor and append observations before commit.
+  Notifications leave only after commit. Options are trusted server metadata.
   """
-  def dispatch_transactional(actor_id, verb_module, args, raw_command) do
+  def dispatch_transactional(actor_id, verb_module, args, raw_command, opts \\ []) do
+    dispatch_resolved(actor_id, verb_module, args, raw_command, nil, nil, opts)
+  end
+
+  def dispatch_resolved(actor_id, verb_module, args, raw_command, dobj, iobj, opts \\ []) do
     if Repo.in_transaction?() do
       {:error, :nested_enactment}
     else
-      do_dispatch_transactional(actor_id, verb_module, args, raw_command)
+      result =
+        Repo.transaction(fn ->
+          with actor when not is_nil(actor) <- Journal.lock_actor(actor_id),
+               {:ok, room} <- fetch_room(actor),
+               :ok <- Journal.validate_session(actor_id, opts) do
+            context =
+              build_context(
+                actor,
+                room,
+                LineCore.Object.contents(room.id),
+                raw_command,
+                dobj,
+                iobj
+              )
+
+            execute_and_record(verb_module, args, context, opts)
+          else
+            nil -> Repo.rollback(:actor_not_found)
+            {:error, reason} -> Repo.rollback(reason)
+          end
+        end)
+
+      case result do
+        {:ok, {:applied, events, context}} ->
+          broadcast_events(events, context)
+          :ok
+
+        {:ok, {:refused, reason}} ->
+          {:error, reason}
+
+        {:error, reason} ->
+          {:error, reason}
+      end
     end
   end
 
-  defp do_dispatch_transactional(actor_id, verb_module, args, raw_command) do
-    import Ecto.Query
+  defp execute_and_record(verb_module, args, context, opts) do
+    metadata = %{
+      "verb" => Atom.to_string(verb_module),
+      "provenance" => Keyword.get(opts, :provenance)
+    }
+
+    journal_opts =
+      opts
+      |> Keyword.put(:location_id, context.room.id)
+      |> Keyword.put(:target_id, if(context.dobj, do: context.dobj.id))
 
     result =
-      Repo.transaction(fn ->
-        actor =
-          Repo.one(
-            from(o in Object,
-              where: o.id == ^actor_id and is_nil(o.deleted_at),
-              lock: "FOR UPDATE"
-            )
-          )
+      with :ok <- check_requirements(context.actor, verb_module),
+           do: verb_module.execute(context, args)
 
-        with actor when not is_nil(actor) <- actor,
-             {:ok, room} <- fetch_room(actor),
-             :ok <- check_requirements(actor, verb_module),
-             context =
-               build_context(
-                 actor,
-                 room,
-                 LineCore.Object.contents(room.id),
-                 raw_command,
-                 nil,
-                 nil
-               ),
-             {:ok, events} <- verb_module.execute(context, args),
-             {:ok, _} <- apply_events(events, context) do
-          {events, context}
-        else
-          nil ->
-            Repo.rollback(:actor_not_found)
+    case result do
+      {:ok, returned_events} ->
+        events = Effects.prepare(returned_events)
 
-          {:error, reason} ->
-            Repo.rollback(reason)
+        case apply_events(events, context, metadata, journal_opts) do
+          {:ok, _} ->
+            {:applied, events, context}
 
           {:error, operation, reason, _changes} ->
             Repo.rollback({:event_failed, operation, reason})
         end
-      end)
-
-    case result do
-      {:ok, {events, context}} ->
-        broadcast_events(events, context)
-        :ok
 
       {:error, reason} ->
-        {:error, reason}
+        outcome =
+          case reason do
+            {:deferred, _} -> "deferred"
+            _ -> "rejected"
+          end
+
+        data = Map.put(metadata, "reason", reason_tag(reason))
+        type = if Keyword.has_key?(opts, :provenance), do: "PROPOSAL", else: "COMMAND"
+        Journal.append_locked(context.actor.id, type, outcome, data, journal_opts)
+        {:refused, reason}
     end
   end
 
-  def dispatch_resolved(actor_id, verb_module, args, raw_command, dobj, iobj) do
-    with {:ok, actor} <- fetch_actor(actor_id),
-         {:ok, room} <- fetch_room(actor),
-         contents = LineCore.Object.contents(room.id),
-         :ok <- check_requirements(actor, verb_module),
-         context = build_context(actor, room, contents, raw_command, dobj, iobj),
-         {:ok, events} <- verb_module.execute(context, args),
-         {:ok, _result} <- apply_events(events, context) do
-      broadcast_events(events, context)
-      :ok
-    end
-  end
+  defp reason_tag({tag, detail}) when tag in [:deferred, :rejected], do: reason_tag(detail)
+  defp reason_tag(reason) when is_atom(reason), do: Atom.to_string(reason)
 
-  defp fetch_actor(actor_id) do
-    case LineCore.Object.get(actor_id) do
-      nil -> {:error, :actor_not_found}
-      actor -> {:ok, actor}
-    end
-  end
+  defp reason_tag(reason) when is_tuple(reason) and tuple_size(reason) > 0,
+    do: reason_tag(elem(reason, 0))
+
+  defp reason_tag(_), do: "unspecified"
 
   defp fetch_room(actor) do
     case LineCore.Object.container_of(actor.id) do
@@ -154,10 +170,15 @@ defmodule LineCore.Dispatcher do
     end
   end
 
-  defp apply_events(events, context) do
+  defp apply_events(events, context, metadata, opts) do
     events
     |> Enum.reduce(Multi.new(), fn event, multi ->
       apply_event_to_multi(multi, event, context)
+    end)
+    |> Multi.run(:play_journal, fn _repo, changes ->
+      data = Map.put(metadata, "effects", Effects.project(events, changes))
+      type = if Keyword.has_key?(opts, :provenance), do: "PROPOSAL", else: "COMMAND"
+      {:ok, Journal.append_locked(context.actor.id, type, "applied", data, opts)}
     end)
     |> Repo.transaction()
   end

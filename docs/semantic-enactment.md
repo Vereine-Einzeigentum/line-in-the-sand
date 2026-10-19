@@ -8,8 +8,8 @@ The [governing intelligence spec](../require_reading/10-adaptive-intelligence.md
 adds Actor → intent → Jev → candidate verb plan for future character cognition.
 That learned planning path is distinct from this deterministic Event Model.
 This item-completion slice implements neither Actor/Jev nor the predictive
-World Model. The [next delivery slice](plans/2026-10-19-adaptive-intelligence-foundation.md)
-is the structured play journal needed by the learning stack.
+World Model. The [structured play journal](play-journal.md) now records its
+applied, deferred, and rejected outcomes alongside ordinary gameplay.
 
 ## Working path
 
@@ -77,12 +77,12 @@ methods reject contradictions with assertions or previously completed facts.
 - Turning asserted weapon traits into bounded combat behavior remains an
   Event Model extension. This slice does not claim generated weapons already
   have mechanically realized behavior.
-- Deferral is explicit and caller-managed. There is no scheduler, durable
-  decision journal, or exactly-once request deduplication yet. Re-enacting an
+- Deferral is explicit and caller-managed. The journal records decision outcomes,
+  but there is no scheduler or exactly-once request deduplication. Re-enacting an
   accepted proposal deliberately creates another item.
 - Scryer integration and a production inference adapter remain separate work.
   The real boundary and failure semantics are implemented and tested now.
-- The new transaction path locks the acting object. It does not solve all
+- Both dispatcher paths lock the acting object. This does not solve all
   existing multiplayer movement or combat races.
 
 CI now runs on `alpha/semantic-spine`, compiles with warnings as errors, tests

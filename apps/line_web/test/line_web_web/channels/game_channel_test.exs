@@ -112,4 +112,19 @@ defmodule LineWebWeb.GameChannelTest do
     assert_push "room_msg", %{text: text}
     assert text =~ "Alice says"
   end
+
+  test "transport session journals commands and disconnect without claiming a quit" do
+    room = TestHarness.spawn_room("Journal hub")
+    player = TestHarness.spawn_player_in(room, "Observer")
+    socket = connect_player(player)
+    ref = push(socket, "command", %{"raw" => "look"})
+    assert_reply ref, :ok, %{status: "dispatched"}
+    Process.unlink(socket.channel_pid)
+    close(socket)
+    entries = LineCore.Journal.export(player.id)
+    assert Enum.map(entries, & &1.event_type) == ["LOGIN", "COMMAND", "DISCONNECT"]
+    assert Enum.map(entries, & &1.session_position) == [1, 2, 3]
+    assert length(Enum.uniq_by(entries, & &1.session_id)) == 1
+    assert Enum.at(entries, 1).outcome == "applied"
+  end
 end
