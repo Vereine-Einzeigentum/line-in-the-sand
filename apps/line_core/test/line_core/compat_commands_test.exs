@@ -310,6 +310,9 @@ defmodule LineCore.CompatCommandsTest do
     assert :ok = CommandRouter.dispatch(mod.id, "@show satchel")
     TestHarness.assert_msg(~r/satchel/i)
 
+    assert :ok = CommandRouter.dispatch(mod.id, "@display satchel")
+    TestHarness.assert_msg(~r/satchel/i)
+
     assert :ok = CommandRouter.dispatch(mod.id, "@examine ##{satchel.id}")
     TestHarness.assert_msg(~r/satchel/i)
 
@@ -321,6 +324,9 @@ defmodule LineCore.CompatCommandsTest do
     TestHarness.assert_msg(~r/satchel/i)
 
     assert :ok = CommandRouter.dispatch(mod.id, "@parents satchel")
+    TestHarness.assert_msg(~r/\$container.*\$item.*\$root/is)
+
+    assert :ok = CommandRouter.dispatch(mod.id, "@parent satchel")
     TestHarness.assert_msg(~r/\$container.*\$item.*\$root/is)
 
     assert :ok = CommandRouter.dispatch(mod.id, "@kids $item")
@@ -336,6 +342,9 @@ defmodule LineCore.CompatCommandsTest do
     assert verbs =~ "lock"
 
     assert :ok = CommandRouter.dispatch(mod.id, "@owned")
+    TestHarness.assert_msg(~r/satchel/i)
+
+    assert :ok = CommandRouter.dispatch(mod.id, "@audit me")
     TestHarness.assert_msg(~r/satchel/i)
   end
 
