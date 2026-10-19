@@ -327,7 +327,10 @@ defmodule LineCore.CompatCommandsTest do
     TestHarness.assert_msg(~r/open.*true/is)
 
     assert :ok = CommandRouter.dispatch(mod.id, "@verbs satchel")
-    TestHarness.assert_msg(~r/put.*open.*lock/is)
+    verbs = TestHarness.assert_msg(~r/Verbs on satchel/i)
+    assert verbs =~ "put"
+    assert verbs =~ "open"
+    assert verbs =~ "lock"
 
     assert :ok = CommandRouter.dispatch(mod.id, "@owned")
     TestHarness.assert_msg(~r/satchel/i)
