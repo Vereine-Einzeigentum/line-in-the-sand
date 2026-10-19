@@ -6,11 +6,18 @@
 
 **Initial logic direction:** Scryer Prolog first for general relational semantics and CLP(Z); Soufflé/Datalog only when world-scale closure workloads justify it; ECLiPSe CLP only when the mathematical completion/optimization workload exceeds the initial solver.
 
+**2026-10-19 update:** The [adaptive intelligence spec](../../require_reading/10-adaptive-intelligence.md)
+governs model responsibilities. The [foundation delivery plan](2026-10-19-adaptive-intelligence-foundation.md)
+sets the next work order: structured play journal and temporal outcomes before
+trained models. The slices below describe the semantic-spine track, not the
+overall intelligence delivery order.
+
 ## Global constraints
 
 - PC/NPC is a control boundary, not a human/AI distinction.
 - Human and AI players are equally valid PCs.
 - Most NPC cognition may be internal AI; persona remains per NPC.
+- Actor owns personality and intent; Jev proposes affordance-grounded action plans. Neither owns executable events or state mutation.
 - Item synthesis is allowed to be absurd. Assertions are preserved, not normalized into familiar equipment classes.
 - Effects are bounded and procedural.
 - Generated fields are separated into asserted facts, unknown fields, derived facts, and solved facts.
@@ -27,7 +34,7 @@
 3. **Enactment authority.** `line_world` decides reject, defer, or enact. This layer owns whether/when, not mechanical realization.
 4. **Event Model.** Enacted consequences become validated event graphs. The Event Model owns event selection, dependencies, prerequisites, and realization.
 5. **Generated-item completion.** Deterministic derivations first, Scryer next; ECLiPSe only for genuinely difficult constraint/optimization workloads; Datalog/Soufflé for large relational closure.
-6. **Alpha cognitive loop.** Per-NPC persona/RP; typed action selector; item synthesis; odd-state interpretation; long-term worldstate; AI PCs and human PCs enter through game access; NPCs are controlled internally; all actions ultimately use the same world mechanics.
+6. **Alpha cognitive loop.** Per-NPC Actor personality and intent; separate Jev actualization into candidate verb plans; item synthesis; odd-state interpretation; long-term worldstate. AI PCs and human PCs enter through game access; NPCs are controlled internally; all proposed actions use ordinary dispatcher validation. Jev remains distinct from the deterministic Event Model that realizes approved semantic consequences.
 
 ## Alpha acceptance target
 
@@ -43,6 +50,6 @@ A generated absurd weapon remains mechanically literal; an internally controlled
 
 ## Open product seams
 
-- Whether generated lineage identifiers are case-sensitive or separately canonicalized from display names.
+- Generated lineage is currently preserved case-sensitively; any later canonicalization must preserve literal asserted semantics.
 - Whether an unsatisfiable generated object is discarded, regenerated, or enters the world broken/nonfunctional.
-- Whether enactment decisions themselves become durable audit records or only resulting event graphs are persisted.
+- The new intelligence foundation requires human-readable decision telemetry alongside committed gameplay history. The journal design must keep rejected/deferred proposals distinct from enacted canonical events.

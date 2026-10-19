@@ -4,6 +4,13 @@
 the world, the Event Model selects the concrete events, and `line_core` executes
 them. Ordinary commands continue through their existing dispatcher path.
 
+The [governing intelligence spec](../require_reading/10-adaptive-intelligence.md)
+adds Actor → intent → Jev → candidate verb plan for future character cognition.
+That learned planning path is distinct from this deterministic Event Model.
+This item-completion slice implements neither Actor/Jev nor the predictive
+World Model. The [next delivery slice](plans/2026-10-19-adaptive-intelligence-foundation.md)
+is the structured play journal needed by the learning stack.
+
 ## Working path
 
 1. `LineMl.complete/2` accepts a `LineMl.Request` and a trusted configured
@@ -67,7 +74,7 @@ methods reject contradictions with assertions or previously completed facts.
   `semantic_provenance`. The open semantic lineage is preserved case-sensitively,
   independently of the MOO prototype tree. An asserted `admin` or `damage`
   value remains semantic data; it does not directly become a live property.
-- Turning asserted weapon traits into bounded combat behavior is the next
+- Turning asserted weapon traits into bounded combat behavior remains an
   Event Model extension. This slice does not claim generated weapons already
   have mechanically realized behavior.
 - Deferral is explicit and caller-managed. There is no scheduler, durable
