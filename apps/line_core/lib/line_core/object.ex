@@ -334,28 +334,35 @@ defmodule LineCore.Object do
   preserving ordinary MOO duplicate-name disambiguation.
   """
   def find_by_name(objects, name) do
-    {ordinal, query} = parse_match_selector(name)
-    normalized = String.downcase(query)
+    trimmed = String.trim(name)
 
-    exact =
-      Enum.filter(objects, fn object ->
-        object
-        |> names_for_matching()
-        |> Enum.any?(&(String.downcase(&1) == normalized))
-      end)
+    if String.starts_with?(trimmed, "#") do
+      id = String.trim_leading(trimmed, "#")
+      Enum.find(objects, &(&1.id == id))
+    else
+      {ordinal, query} = parse_match_selector(trimmed)
+      normalized = String.downcase(query)
 
-    matches =
-      if exact == [] do
+      exact =
         Enum.filter(objects, fn object ->
           object
           |> names_for_matching()
-          |> Enum.any?(&String.contains?(String.downcase(&1), normalized))
+          |> Enum.any?(&(String.downcase(&1) == normalized))
         end)
-      else
-        exact
-      end
 
-    Enum.at(matches, ordinal - 1)
+      matches =
+        if exact == [] do
+          Enum.filter(objects, fn object ->
+            object
+            |> names_for_matching()
+            |> Enum.any?(&String.contains?(String.downcase(&1), normalized))
+          end)
+        else
+          exact
+        end
+
+      Enum.at(matches, ordinal - 1)
+    end
   end
 
   defp names_for_matching(object) do
