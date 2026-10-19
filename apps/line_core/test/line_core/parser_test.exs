@@ -31,6 +31,22 @@ defmodule LineCore.ParserTest do
   end
 
   describe "system commands" do
+    test "commands aliases help" do
+      assert {:ok, Verbs.Help, []} = Parser.parse("commands")
+    end
+
+    test "LambdaCore @commands use unique prefix abbreviations and canonical aliases" do
+      assert {:ok, Verbs.BuilderClasses, []} = Parser.parse("@cla")
+      assert {:ok, Verbs.BuilderParents, ["widget"]} = Parser.parse("@par widget")
+      assert {:ok, Verbs.BuilderProperty, ["widget:color red"]} =
+               Parser.parse("@prop widget:color red")
+
+      assert {:ok, Verbs.BuilderRmProperty, ["widget:color"]} =
+               Parser.parse("@rmprop widget:color")
+
+      assert {:world, %WorldCommand{verb: "@c"}} = Parser.parse("@c")
+    end
+
     test "who stays in the system registry" do
       assert {:ok, Verbs.Who, []} = Parser.parse("who")
       assert {:ok, Verbs.Who, ["Graves"]} = Parser.parse("who Graves")
@@ -111,6 +127,48 @@ defmodule LineCore.ParserTest do
                 dobjstr: "fence",
                 prepstr: "at"
               }} = Parser.parse_world("look at fence")
+    end
+
+    test "parses the full LambdaCore preposition vocabulary including leading prepositions" do
+      assert {:ok,
+              %WorldCommand{
+                verb: "look",
+                dobjstr: nil,
+                prepstr: "in front of",
+                iobjstr: "panel"
+              }} = Parser.parse_world("look in front of panel")
+
+      assert {:ok,
+              %WorldCommand{
+                verb: "put",
+                dobjstr: "coin",
+                prepstr: "on",
+                iobjstr: "table"
+              }} = Parser.parse_world("put coin on top of table")
+
+      assert {:ok,
+              %WorldCommand{
+                verb: "crawl",
+                dobjstr: nil,
+                prepstr: "under",
+                iobjstr: "door"
+              }} = Parser.parse_world("crawl underneath door")
+
+      assert {:ok,
+              %WorldCommand{
+                verb: "ask",
+                dobjstr: "Bob",
+                prepstr: "for",
+                iobjstr: "key"
+              }} = Parser.parse_world("ask Bob about key")
+
+      assert {:ok,
+              %WorldCommand{
+                verb: "look",
+                dobjstr: nil,
+                prepstr: "through",
+                iobjstr: "peephole"
+              }} = Parser.parse_world("look through peephole")
     end
 
     test "unrecognized ordinary words remain world commands for huh/verb search" do
