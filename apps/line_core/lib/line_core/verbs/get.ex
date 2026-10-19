@@ -13,6 +13,29 @@ defmodule LineCore.Verbs.Get do
   @impl true
   def execute(_ctx, []), do: {:error, :get_what}
 
+  def execute(ctx, ["all"]) do
+    items =
+      ctx.room_contents
+      |> Enum.reject(&(&1.id == ctx.actor.id))
+      |> Enum.filter(&(&1.type == :item))
+
+    case items do
+      [] ->
+        {:error, :not_found}
+
+      _ ->
+        moves = Enum.map(items, &{:move, &1.id, ctx.actor.id, :contains})
+        names = Enum.map_join(items, ", ", & &1.name)
+
+        {:ok,
+         moves ++
+           [
+             {:notify_actor, "You pick up: #{names}."},
+             {:notify_room, "#{ctx.actor.name} picks up several things.", except: [ctx.actor.id]}
+           ]}
+    end
+  end
+
   def execute(ctx, [name]) do
     candidate =
       ctx.room_contents
