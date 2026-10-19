@@ -390,6 +390,19 @@ defmodule LineCore.CompatCommandsTest do
     assert Object.container_of(mod.id).id == b.id
   end
 
+
+  test "moderator @classes lists nested archetypes, not only root children", ctx do
+    {:ok, mod} = Object.create(:player, "Mod", %{parent_id: ctx.tree.mod.id})
+    {:ok, _} = Object.relate(ctx.room.id, mod.id, :contains)
+    LineCore.PubSub.subscribe({:actor, mod.id})
+
+    assert :ok = CommandRouter.dispatch(mod.id, "@classes")
+    classes = TestHarness.assert_msg(~r/Classes:/)
+    assert classes =~ "$container"
+    assert classes =~ "$weapon"
+    assert classes =~ "$clothing"
+  end
+
   test "ordinary players cannot use moderator builder commands", ctx do
     assert {:error, :permission_denied} =
              CommandRouter.dispatch(ctx.player.id, "@create $container named satchel")
