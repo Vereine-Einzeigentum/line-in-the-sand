@@ -925,3 +925,71 @@ defmodule LineCore.Verbs.BuilderRmProperty do
 
   def execute(_ctx, _args), do: {:error, :bad_args}
 end
+
+
+defmodule LineCore.Verbs.BuilderEject do
+  @behaviour LineCore.Verb
+
+  alias LineCore.{Builder, Object}
+
+  @impl true
+  def execute(ctx, [spec]) when is_binary(spec) do
+    with :ok <- Builder.require(ctx.actor),
+         {:ok, target_name, source} <- parse_target_and_source(ctx, spec),
+         target when not is_nil(target) <- Object.find_by_name(Object.contents(source.id), target_name) do
+      events =
+        case valid_home(target) do
+          nil ->
+            [{:unrelate, source.id, target.id, :contains}]
+
+          home ->
+            [{:move, target.id, home.id, :contains}]
+        end
+
+      notices =
+        [
+          {:notify_actor, "You eject #{target.name} from #{source.name}."},
+          {:notify_room, "#{ctx.actor.name} ejects #{target.name} from #{source.name}.",
+           except: [ctx.actor.id, target.id]}
+        ] ++
+          if target.id == ctx.actor.id do
+            []
+          else
+            [{:notify_object, target.id, "You have been ejected from #{source.name}."}]
+          end
+
+      {:ok, events ++ notices}
+    else
+      nil -> {:error, :not_found}
+      {:error, _} = error -> error
+    end
+  end
+
+  def execute(_ctx, _args), do: {:error, :bad_args}
+
+  defp parse_target_and_source(ctx, spec) do
+    trimmed = String.trim(spec)
+
+    case Regex.run(~r/^(.+?)\s+from\s+(.+)$/i, trimmed) do
+      [_, target_name, source_name] ->
+        case Builder.resolve_any(ctx, String.trim(source_name)) do
+          nil -> {:error, :not_found}
+          source -> {:ok, String.trim(target_name), source}
+        end
+
+      _ ->
+        if trimmed == "" do
+          {:error, :bad_args}
+        else
+          {:ok, trimmed, ctx.room}
+        end
+    end
+  end
+
+  defp valid_home(target) do
+    case Object.get_property(target.id, "home_room_id") do
+      id when is_binary(id) -> Object.get(id)
+      _ -> nil
+    end
+  end
+end
